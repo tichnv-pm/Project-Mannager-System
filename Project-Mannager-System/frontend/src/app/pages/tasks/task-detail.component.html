@@ -1,0 +1,584 @@
+<div class="task-detail-page">
+
+  <!-- Back Navigation -->
+  <div class="back-nav">
+    <a routerLink="/tasks" class="back-link">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      Quay lại danh sách
+    </a>
+  </div>
+
+  <!-- Loading -->
+  <div *ngIf="loading()" class="loading-state">
+    <div class="spinner"></div>
+    <p>Đang tải chi tiết công việc...</p>
+  </div>
+
+  <!-- Error -->
+  <div *ngIf="error() && !loading()" class="error-state">
+    <div class="error-icon">⚠️</div>
+    <p>{{ error() }}</p>
+    <a routerLink="/tasks" class="btn-secondary">Quay lại danh sách</a>
+  </div>
+
+  <!-- ════════════════════ CONTENT ════════════════════ -->
+  <ng-container *ngIf="!loading() && task()">
+
+    <!-- Hero Header -->
+    <div class="hero-header" [class.overdue-hero]="isOverdue()">
+      <div class="hero-left">
+        <div class="breadcrumb-row">
+          <a [routerLink]="['/projects', task()!.projectId]" class="project-link">
+            [{{ task()!.projectCode }}] {{ task()!.projectName }}
+          </a>
+          <span class="sep">/</span>
+          <code class="task-code-hero">{{ task()!.code }}</code>
+        </div>
+        <h1 class="task-title-hero">{{ task()!.title }}</h1>
+        <div class="hero-chips">
+          <app-status-chip [status]="task()!.status"></app-status-chip>
+          <app-priority-chip [priority]="task()!.priority"></app-priority-chip>
+          <span class="type-badge">{{ getTypeLabel(task()!.type) }}</span>
+          <span *ngIf="task()!.blocked" class="blocker-badge-hero">🚧 Đang tắc nghẽn</span>
+          <span *ngIf="isOverdue()" class="overdue-badge">🔴 Quá hạn</span>
+        </div>
+      </div>
+      <div class="hero-actions">
+        <button *hasPermission="'task:update'" (click)="openStatusModal()" class="btn-status" id="btn-change-status">
+          🔄 Trạng thái
+        </button>
+        <button *hasPermission="'task:update'" (click)="openEditModal()" class="btn-edit" id="btn-edit-task">
+          ✏️ Chỉnh sửa
+        </button>
+        <button *hasPermission="'task:delete'" (click)="openDeleteModal()" class="btn-del" id="btn-delete-task">
+          🗑️
+        </button>
+      </div>
+    </div>
+
+    <!-- Progress Bar (full width) -->
+    <div class="progress-hero-bar">
+      <div class="progress-track">
+        <div class="progress-fill"
+          [style.width.%]="task()!.progress"
+          [style.background]="getProgressColor(task()!.progress)">
+        </div>
+      </div>
+      <span class="progress-pct" [style.color]="getProgressColor(task()!.progress)">{{ task()!.progress }}%</span>
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="detail-grid">
+
+      <!-- Left: Info Panel -->
+      <div class="info-panel">
+        <div class="info-card">
+          <h3 class="card-title">📋 Thông tin công việc</h3>
+          <div class="info-list">
+            <div class="info-row">
+              <span class="label">Mã công việc</span>
+              <code class="val-code">{{ task()!.code }}</code>
+            </div>
+            <div class="info-row">
+              <span class="label">Dự án</span>
+              <a [routerLink]="['/projects', task()!.projectId]" class="val-link">[{{ task()!.projectCode }}] {{ task()!.projectName }}</a>
+            </div>
+            <div class="info-row" *ngIf="task()!.parentTaskCode">
+              <span class="label">Task cha</span>
+              <a [routerLink]="['/tasks', task()!.parentTaskId]" class="val-link">{{ task()!.parentTaskCode }}</a>
+            </div>
+            <div class="info-row">
+              <span class="label">Loại</span>
+              <span class="val">{{ getTypeLabel(task()!.type) }}</span>
+            </div>
+            <div class="info-row" *ngIf="task()!.source">
+              <span class="label">Nguồn</span>
+              <span class="val">{{ getSourceLabel(task()!.source!) }}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Ngày bắt đầu</span>
+              <span class="val">{{ task()!.startDate || '—' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Hạn chót</span>
+              <span class="val" [class.val-overdue]="isOverdue()">{{ task()!.dueDate || '—' }}</span>
+            </div>
+            <div class="info-row" *ngIf="task()!.actualCompletedAt">
+              <span class="label">Hoàn thành lúc</span>
+              <span class="val val-success">{{ task()!.actualCompletedAt | date:'dd/MM/yyyy HH:mm' }}</span>
+            </div>
+            <div class="info-row" *ngIf="task()!.estimateMinutes">
+              <span class="label">Ước tính</span>
+              <span class="val">{{ task()!.estimateMinutes }} phút</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- People Card -->
+        <div class="info-card">
+          <h3 class="card-title">👥 Người liên quan</h3>
+          <div class="info-list">
+            <div class="info-row">
+              <span class="label">Người thực hiện</span>
+              <span class="val" *ngIf="task()!.assignee">
+                <span class="user-chip">
+                  <span class="user-av">{{ task()!.assignee!.fullName[0] }}</span>
+                  {{ task()!.assignee!.fullName }}
+                </span>
+              </span>
+              <span class="val muted" *ngIf="!task()!.assignee">Chưa gán</span>
+            </div>
+            <div class="info-row" *ngIf="task()!.reporter">
+              <span class="label">Người tạo</span>
+              <span class="val">
+                <span class="user-chip">
+                  <span class="user-av reporter-av">{{ task()!.reporter!.fullName[0] }}</span>
+                  {{ task()!.reporter!.fullName }}
+                </span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Collaborators -->
+          <div *ngIf="task()!.collaborators?.length > 0" class="people-section">
+            <span class="people-label">Người phối hợp</span>
+            <div class="people-chips">
+              <span *ngFor="let c of task()!.collaborators" class="user-chip-sm">
+                <span class="user-av-sm">{{ c.fullName[0] }}</span>
+                {{ c.fullName }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Watchers -->
+          <div *ngIf="task()!.watchers?.length > 0" class="people-section">
+            <span class="people-label">Người theo dõi</span>
+            <div class="people-chips">
+              <span *ngFor="let w of task()!.watchers" class="user-chip-sm watcher">
+                👁️ {{ w.fullName }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tags -->
+        <div class="info-card" *ngIf="task()!.tags?.length > 0">
+          <h3 class="card-title">🏷️ Tags</h3>
+          <div class="tags-row">
+            <span *ngFor="let tag of task()!.tags" class="tag-chip" [style.background]="tag.color ? tag.color + '25' : 'rgba(99,102,241,0.15)'" [style.border-color]="tag.color ?? '#6366f1'">
+              {{ tag.name }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Progress Update -->
+        <div class="info-card" *hasPermission="'task:update'">
+          <h3 class="card-title">📊 Cập nhật tiến độ</h3>
+          <div class="progress-update-section">
+            <div class="current-progress">
+              <div class="p-track">
+                <div class="p-fill" [style.width.%]="task()!.progress" [style.background]="getProgressColor(task()!.progress)"></div>
+              </div>
+              <span class="p-val" [style.color]="getProgressColor(task()!.progress)">{{ task()!.progress }}%</span>
+            </div>
+            <div class="slider-row">
+              <input type="range" min="0" max="100" step="5" [value]="newProgress()"
+                (input)="newProgress.set(+$any($event.target).value)" class="range-slider" id="progress-slider" />
+              <span class="slider-val">{{ newProgress() }}%</span>
+              <button (click)="updateProgress()" class="btn-primary btn-sm"
+                [disabled]="progressUpdating() || newProgress() === task()!.progress" id="btn-update-progress">
+                <span *ngIf="!progressUpdating()">Cập nhật</span>
+                <span *ngIf="progressUpdating()">...</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Blocker Box -->
+        <div class="blocker-box" *ngIf="task()!.blocked && task()!.blockerReason">
+          <div class="blocker-title">🚧 Nguyên nhân tắc nghẽn</div>
+          <p class="blocker-text">{{ task()!.blockerReason }}</p>
+        </div>
+      </div>
+
+      <!-- Right: Tabs Panel -->
+      <div class="tabs-panel">
+
+        <!-- Tab Header -->
+        <div class="tabs-header">
+          <button class="tab-btn" [class.active]="activeTab() === 'overview'" (click)="setTab('overview')" id="tab-overview">
+            📌 Mô tả
+          </button>
+          <button class="tab-btn" [class.active]="activeTab() === 'comments'" (click)="setTab('comments')" id="tab-comments">
+            💬 Bình luận
+            <span class="tab-badge" *ngIf="comments().length > 0">{{ comments().length }}</span>
+          </button>
+          <button class="tab-btn" [class.active]="activeTab() === 'attachments'" (click)="setTab('attachments')" id="tab-attachments">
+            📎 Đính kèm
+            <span class="tab-badge" *ngIf="attachments().length > 0">{{ attachments().length }}</span>
+          </button>
+          <button class="tab-btn" [class.active]="activeTab() === 'history'" (click)="setTab('history')" id="tab-history">
+            📜 Lịch sử
+          </button>
+          <button class="tab-btn" [class.active]="activeTab() === 'children'" (click)="setTab('children')" id="tab-children">
+            🌿 Task con
+          </button>
+          <button class="tab-btn" [class.active]="activeTab() === 'git'" (click)="setTab('git')" id="tab-git">
+            🧬 Git (Mã nguồn)
+          </button>
+        </div>
+
+        <!-- ── Tab: Overview / Description ── -->
+        <div *ngIf="activeTab() === 'overview'" class="tab-content">
+          <div *ngIf="task()!.description" class="desc-card">
+            <h4>Mô tả chi tiết</h4>
+            <p class="desc-text">{{ task()!.description }}</p>
+          </div>
+          <div *ngIf="!task()!.description" class="empty-tab">
+            <p>Chưa có mô tả chi tiết</p>
+          </div>
+          <div *ngIf="task()!.notes" class="notes-card">
+            <h4>📝 Ghi chú nội bộ</h4>
+            <p class="notes-text">{{ task()!.notes }}</p>
+          </div>
+        </div>
+
+        <!-- ── Tab: Comments ── -->
+        <div *ngIf="activeTab() === 'comments'" class="tab-content">
+
+          <!-- Add Comment -->
+          <div class="add-comment-box" *hasPermission="'task:comment'">
+            <textarea
+              [(ngModel)]="newCommentContent"
+              rows="3"
+              id="new-comment-input"
+              placeholder="Thêm bình luận hoặc trao đổi về công việc này..."
+              class="form-control"
+            ></textarea>
+            <div class="comment-submit-row">
+              <button (click)="submitComment()" class="btn-primary btn-sm"
+                [disabled]="submittingComment() || !newCommentContent.trim()" id="btn-submit-comment">
+                <span *ngIf="!submittingComment()">Gửi bình luận</span>
+                <span *ngIf="submittingComment()">Đang gửi...</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Loading -->
+          <div *ngIf="commentsLoading()" class="mini-loading">Đang tải bình luận...</div>
+
+          <!-- Comments List -->
+          <div class="comments-list" *ngIf="!commentsLoading()">
+            <div *ngIf="comments().length === 0" class="empty-tab">Chưa có bình luận nào</div>
+            <div *ngFor="let c of comments()" class="comment-item" [id]="'comment-' + c.id">
+              <div class="comment-header">
+                <div class="author-row">
+                  <div class="c-avatar">{{ c.userFullName ? c.userFullName[0].toUpperCase() : 'U' }}</div>
+                  <span class="author-name">{{ c.userFullName }}</span>
+                  <span class="comment-time">{{ c.createdAt | date:'HH:mm dd/MM/yyyy' }}</span>
+                  <span *ngIf="c.updatedAt" class="edited-badge">(đã sửa)</span>
+                </div>
+                <div class="comment-actions" *hasPermission="'task:comment'">
+                  <button (click)="startEditComment(c)" class="btn-icon-sm" title="Sửa" *ngIf="editingCommentId !== c.id" [id]="'edit-comment-' + c.id">✏️</button>
+                  <button (click)="deleteComment(c.id)" class="btn-icon-danger-sm" title="Xóa" [id]="'delete-comment-' + c.id">🗑️</button>
+                </div>
+              </div>
+
+              <!-- View Mode -->
+              <p *ngIf="editingCommentId !== c.id" class="comment-body">{{ c.content }}</p>
+
+              <!-- Edit Mode -->
+              <div *ngIf="editingCommentId === c.id" class="comment-edit-box">
+                <textarea [(ngModel)]="editingCommentContent" rows="3" class="form-control" [id]="'edit-comment-input-' + c.id"></textarea>
+                <div class="edit-actions">
+                  <button (click)="cancelEditComment()" class="btn-secondary btn-xs">Hủy</button>
+                  <button (click)="saveComment()" [disabled]="updatingComment()" class="btn-primary btn-xs" [id]="'save-comment-' + c.id">Lưu</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Tab: Attachments ── -->
+        <div *ngIf="activeTab() === 'attachments'" class="tab-content">
+
+          <!-- Upload Zone -->
+          <div class="upload-zone" *hasPermission="'task:attachment'">
+            <div *ngIf="!selectedFile" class="upload-prompt">
+              <label for="file-upload" class="upload-label">
+                <div class="upload-icon">📁</div>
+                <span>Kéo thả hoặc <strong>chọn file</strong> để upload</span>
+                <span class="upload-hint">Tối đa 10MB • PNG, JPG, PDF, XLSX, DOCX, TXT</span>
+                <input type="file" id="file-upload" class="file-input" (change)="onFileSelected($event)" />
+              </label>
+            </div>
+            <div *ngIf="selectedFile" class="selected-file-row">
+              <span class="selected-icon">{{ getFileIcon(selectedFile.type) }}</span>
+              <div class="selected-info">
+                <span class="selected-name">{{ selectedFile.name }}</span>
+                <span class="selected-size">{{ formatFileSize(selectedFile.size) }}</span>
+              </div>
+              <button (click)="uploadAttachment()" class="btn-primary btn-sm" [disabled]="uploadingFile()" id="btn-upload">
+                <span *ngIf="!uploadingFile()">📤 Upload</span>
+                <span *ngIf="uploadingFile()">Đang upload...</span>
+              </button>
+              <button (click)="selectedFile = null" class="btn-secondary btn-xs">✕</button>
+            </div>
+            <div *ngIf="uploadError()" class="upload-error">⚠️ {{ uploadError() }}</div>
+          </div>
+
+          <!-- Loading -->
+          <div *ngIf="attachmentsLoading()" class="mini-loading">Đang tải file đính kèm...</div>
+
+          <!-- Files List -->
+          <div class="attachments-list" *ngIf="!attachmentsLoading()">
+            <div *ngIf="attachments().length === 0" class="empty-tab">Chưa có file đính kèm nào</div>
+            <div *ngFor="let a of attachments()" class="attachment-row" [id]="'attachment-' + a.id">
+              <span class="file-icon-lg">{{ getFileIcon(a.contentType) }}</span>
+              <div class="file-details">
+                <a [href]="a.filePath || a.fileUrl || '#'" target="_blank" class="file-name">{{ a.fileName }}</a>
+                <div class="file-meta-row">
+                  <span>{{ formatFileSize(a.sizeBytes || a.fileSize || 0) }}</span>
+                  <span>{{ a.contentType }}</span>
+                  <span *ngIf="a.uploadedByName">Bởi {{ a.uploadedByName }}</span>
+                  <span>{{ (a.createdAt || a.uploadedAt) | date:'dd/MM/yyyy HH:mm' }}</span>
+                </div>
+              </div>
+              <button *hasPermission="'task:attachment'" (click)="deleteAttachment(a.id, a.fileName)"
+                class="btn-icon-danger-sm" title="Xóa file" [id]="'delete-attachment-' + a.id">🗑️</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Tab: History ── -->
+        <div *ngIf="activeTab() === 'history'" class="tab-content">
+          <div *ngIf="historyLoading()" class="mini-loading">Đang tải lịch sử...</div>
+          <div class="history-timeline" *ngIf="!historyLoading()">
+            <div *ngIf="history().length === 0" class="empty-tab">Chưa có lịch sử thay đổi</div>
+            <div *ngFor="let h of history(); let last = last" class="history-item" [class.last]="last" [id]="'history-' + (h.id || h.changedAt)">
+              <div class="h-dot"></div>
+              <div class="h-content">
+                <div class="h-header">
+                  <div class="h-avatar">{{ getHistoryUser(h)[0] }}</div>
+                  <span class="h-user">{{ getHistoryUser(h) }}</span>
+                  <code class="h-action">{{ h.action }}</code>
+                  <span class="h-time">{{ getHistoryTime(h) | date:'HH:mm dd/MM/yyyy' }}</span>
+                </div>
+                <div class="h-changes">
+                  <div *ngFor="let change of getHistoryChanges(h)" class="h-change">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    {{ change }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Tab: Children ── -->
+        <div *ngIf="activeTab() === 'children'" class="tab-content">
+          <div *ngIf="childrenLoading()" class="mini-loading">Đang tải task con...</div>
+          <div *ngIf="!childrenLoading()">
+            <div *ngIf="childTasks().length === 0" class="empty-tab">Không có task con</div>
+            <div class="children-list">
+              <a *ngFor="let child of childTasks()" [routerLink]="['/tasks', child.id]" class="child-task-row" [id]="'child-' + child.id">
+                <code class="task-code-sm">{{ child.code }}</code>
+                <span class="child-title">{{ child.title }}</span>
+                <app-status-chip [status]="child.status"></app-status-chip>
+                <div class="child-progress">
+                  <div class="p-track-sm"><div class="p-fill-sm" [style.width.%]="child.progress"></div></div>
+                  <span>{{ child.progress }}%</span>
+                </div>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Tab: Git ── -->
+        <div *ngIf="activeTab() === 'git'" class="tab-content">
+          <div *ngIf="gitLoading()" class="mini-loading">Đang tải thông tin Git...</div>
+          <div *ngIf="!gitLoading()">
+            
+            <div class="git-section">
+              <h5>Pull Requests / Merge Requests</h5>
+              <div *ngIf="gitPrs().length === 0" class="empty-tab">Chưa có Pull Request nào liên kết</div>
+              <div class="git-list" *ngIf="gitPrs().length > 0">
+                <div *ngFor="let pr of gitPrs()" class="git-item pr-item">
+                  <div class="git-item-title">
+                    <span class="pr-number bold">#{{ pr.prNumber }}</span>
+                    <span class="pr-title">{{ pr.title }}</span>
+                  </div>
+                  <div class="git-item-meta">
+                    <span class="pr-status-badge" [ngClass]="pr.status.toLowerCase()">{{ pr.status }}</span>
+                    <span class="pr-time">{{ pr.updatedAt | date:'HH:mm dd/MM/yyyy' }}</span>
+                    <a *ngIf="pr.prUrl" [href]="pr.prUrl" target="_blank" class="git-link">Xem PR ↗</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="git-section margin-top-lg">
+              <h5>Danh sách Commits</h5>
+              <div *ngIf="gitCommits().length === 0" class="empty-tab">Chưa có Commit nào liên kết</div>
+              <div class="git-list" *ngIf="gitCommits().length > 0">
+                <div *ngFor="let commit of gitCommits()" class="git-item commit-item">
+                  <div class="git-item-title">
+                    <code class="commit-hash">{{ commit.commitHash | slice:0:8 }}</code>
+                    <span class="commit-message">{{ commit.message }}</span>
+                  </div>
+                  <div class="git-item-meta">
+                    <span class="commit-author">👤 {{ commit.author }}</span>
+                    <span class="commit-time">{{ commit.createdAt | date:'HH:mm dd/MM/yyyy' }}</span>
+                    <a *ngIf="commit.commitUrl" [href]="commit.commitUrl" target="_blank" class="git-link">Xem Commit ↗</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div><!-- /tabs-panel -->
+    </div><!-- /detail-grid -->
+  </ng-container>
+
+  <!-- ════════════════════ MODALS ════════════════════ -->
+
+  <!-- Modal: Status Change -->
+  <div *ngIf="showStatusModal()" class="modal-backdrop" (click)="closeStatusModal()">
+    <div class="modal-card modal-sm" (click)="$event.stopPropagation()" id="status-modal">
+      <div class="modal-header">
+        <h3>🔄 Chuyển trạng thái</h3>
+        <button (click)="closeStatusModal()" class="close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="task-preview-mini">
+          <code>{{ task()?.code }}</code>
+          <span>{{ task()?.title | slice:0:60 }}</span>
+        </div>
+        <div *ngIf="statusError()" class="alert alert-danger">{{ statusError() }}</div>
+        <div class="form-group">
+          <label>Trạng thái mới</label>
+          <select [(ngModel)]="newStatus" (change)="statusError.set(null)" class="form-control" id="select-status">
+            <option *ngFor="let opt of allowedStatuses()" [value]="opt.value">{{ opt.label }}</option>
+          </select>
+        </div>
+        <div *ngIf="newStatus === 'BLOCKED'" class="form-group">
+          <label>Lý do tắc nghẽn <span class="req">*</span></label>
+          <textarea [(ngModel)]="blockerReason" rows="3" class="form-control" id="blocker-reason-input" placeholder="Mô tả nguyên nhân..."></textarea>
+        </div>
+        <div *ngIf="newStatus === 'DONE'" class="alert alert-info">ℹ️ Tiến độ sẽ tự động đặt thành 100%.</div>
+      </div>
+      <div class="modal-footer">
+        <button (click)="closeStatusModal()" class="btn-secondary">Hủy</button>
+        <button (click)="confirmStatusChange()" class="btn-primary" [disabled]="statusSubmitting()" id="confirm-status">
+          <span *ngIf="!statusSubmitting()">Xác nhận</span>
+          <span *ngIf="statusSubmitting()">Đang xử lý...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Edit Task -->
+  <div *ngIf="showEditModal()" class="modal-backdrop" (click)="closeEditModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()" id="edit-task-modal">
+      <div class="modal-header">
+        <h3>✏️ Chỉnh sửa công việc</h3>
+        <button (click)="closeEditModal()" class="close-btn">✕</button>
+      </div>
+      <div *ngIf="editError()" class="alert alert-danger">⚠️ {{ editError() }}</div>
+      <form [formGroup]="editForm" (ngSubmit)="saveEdit()" class="modal-body">
+        <div class="form-group">
+          <label>Tiêu đề <span class="req">*</span></label>
+          <input type="text" formControlName="title" class="form-control" id="edit-task-title" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Loại</label>
+            <select formControlName="type" class="form-control" id="edit-task-type">
+              <option value="TASK">📋 Công việc</option>
+              <option value="FEATURE">✨ Tính năng</option>
+              <option value="BUG">🐛 Lỗi</option>
+              <option value="IMPROVEMENT">⬆️ Cải tiến</option>
+              <option value="OTHER">📦 Khác</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Ưu tiên</label>
+            <select formControlName="priority" class="form-control" id="edit-task-priority">
+              <option value="LOW">🟢 Thấp</option>
+              <option value="MEDIUM">🟡 Trung bình</option>
+              <option value="HIGH">🟠 Cao</option>
+              <option value="URGENT">🔴 Khẩn cấp</option>
+              <option value="CRITICAL">🚨 Nghiêm trọng</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Người thực hiện</label>
+            <select formControlName="assigneeId" class="form-control" id="edit-task-assignee">
+              <option value="">— Chưa gán —</option>
+              <option *ngFor="let u of usersList()" [value]="u.id">{{ u.fullName || u.username }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Ngày bắt đầu</label>
+            <input type="date" formControlName="startDate" class="form-control" id="edit-start-date" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Hạn chót</label>
+            <input type="date" formControlName="dueDate" class="form-control" id="edit-due-date" />
+          </div>
+          <div class="form-group">
+            <label>Ước tính (phút)</label>
+            <input type="number" formControlName="estimateMinutes" min="0" class="form-control" id="edit-estimate" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Mô tả</label>
+          <textarea formControlName="description" rows="4" class="form-control" id="edit-description"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Ghi chú</label>
+          <textarea formControlName="notes" rows="2" class="form-control" id="edit-notes"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" (click)="closeEditModal()" class="btn-secondary">Hủy</button>
+          <button type="submit" class="btn-primary" [disabled]="editSubmitting()" id="save-edit-task">
+            <span *ngIf="!editSubmitting()">Lưu</span>
+            <span *ngIf="editSubmitting()">Đang lưu...</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Delete Task -->
+  <div *ngIf="showDeleteModal()" class="modal-backdrop" (click)="closeDeleteModal()">
+    <div class="modal-card modal-sm" (click)="$event.stopPropagation()" id="delete-task-modal">
+      <div class="modal-header">
+        <h3>🗑️ Xóa công việc</h3>
+        <button (click)="closeDeleteModal()" class="close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="delete-confirm-box">
+          <div class="delete-icon-lg">⚠️</div>
+          <p>Xác nhận xóa công việc <code>{{ task()?.code }}</code>:</p>
+          <strong class="delete-name">{{ task()?.title }}</strong>
+          <p class="delete-note">Không thể hoàn tác. Task con phải được xóa trước.</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button (click)="closeDeleteModal()" class="btn-secondary">Hủy</button>
+        <button (click)="confirmDelete()" class="btn-danger" [disabled]="deleteSubmitting()" id="confirm-delete-task">
+          <span *ngIf="!deleteSubmitting()">Xóa</span>
+          <span *ngIf="deleteSubmitting()">Đang xóa...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>

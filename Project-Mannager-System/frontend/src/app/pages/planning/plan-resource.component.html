@@ -1,0 +1,345 @@
+<div class="plan-resource">
+  <div class="res-toolbar">
+    <h3>👥 Resource & Workload</h3>
+  </div>
+
+  <div *ngIf="loading()" class="loading-state">
+    <div class="spinner"></div>
+    <p>Đang tải...</p>
+  </div>
+
+  <div *ngIf="error() && !loading()" class="alert alert-danger">
+    ⚠️ {{ error() }}
+    <button (click)="load()" class="btn-secondary btn-sm">Thử lại</button>
+  </div>
+
+  <div *ngIf="!loading() && !error()" class="res-body">
+    <!-- ─── Assign form ─────────────────────────────────────── -->
+    <div class="section-card">
+      <h4>Gán resource cho task</h4>
+      <div *ngIf="assignError()" class="alert alert-warning">⚠️ {{ assignError() }}</div>
+      <form [formGroup]="assignForm" (ngSubmit)="assign()" class="assign-form">
+        <div class="form-group col-lg">
+          <label>Task <span class="req">*</span></label>
+          <select formControlName="taskId" class="form-control">
+            <option value="" disabled>— Chọn task —</option>
+            <option *ngFor="let t of tasks()" [value]="t.id">{{ t.wbsCode }} — {{ t.taskName }}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Loại resource <span class="req">*</span></label>
+          <select formControlName="resourceType" class="form-control" (change)="onResourceTypeChange()">
+            <option *ngFor="let k of typeKeys" [value]="k">{{ typeLabels[k] }}</option>
+          </select>
+        </div>
+        <div class="form-group col-lg">
+          <label>Resource <span class="req">*</span></label>
+          <select *ngIf="assignForm.get('resourceType')?.value === 'USER'" formControlName="resourceId" class="form-control">
+            <option value="" disabled>— Chọn thành viên dự án —</option>
+            <option *ngFor="let m of members()" [value]="m.userId">{{ m.fullName }} ({{ m.username }})</option>
+          </select>
+          <input
+            *ngIf="assignForm.get('resourceType')?.value !== 'USER'"
+            type="text"
+            formControlName="resourceId"
+            class="form-control"
+            placeholder="UUID của role / resource bên ngoài"
+          />
+        </div>
+        <div class="form-group">
+          <label>Allocation %</label>
+          <input type="number" min="1" max="100" formControlName="allocationPercent" class="form-control" />
+        </div>
+        <div class="form-group">
+          <label>Vai trò trên task</label>
+          <input type="text" formControlName="roleOnTask" class="form-control" placeholder="VD: Dev, Tester" />
+        </div>
+        <div class="form-group">
+          <label>Bắt đầu</label>
+          <input type="date" formControlName="startDate" class="form-control" />
+        </div>
+        <div class="form-group">
+          <label>Kết thúc</label>
+          <input type="date" formControlName="endDate" class="form-control" />
+        </div>
+        <div class="form-group">
+          <label>Công sức (phút)</label>
+          <input type="number" min="0" formControlName="plannedEffortMinutes" class="form-control" />
+        </div>
+        <div class="form-actions">
+          <button *hasPermission="'plan:resource'" type="submit" class="btn-primary" [disabled]="assignBusy()">
+            <span *ngIf="!assignBusy()">➕ Gán</span>
+            <span *ngIf="assignBusy()">Đang gán...</span>
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- ─── Allocations ─────────────────────────────────────── -->
+    <div class="section-card">
+      <h4>Resource đã gán trong plan ({{ allocations().length }})</h4>
+      <div *ngIf="allocationsBusy()" class="loading-state">
+        <div class="spinner"></div>
+        <p>Đang tải...</p>
+      </div>
+      <app-empty-state
+        *ngIf="!allocationsBusy() && allocations().length === 0"
+        title="Chưa gán resource"
+        description="Gán USER/ROLE/EXTERNAL vào task để theo dõi workload và over-allocation."
+      >
+      </app-empty-state>
+      <div *ngIf="!allocationsBusy() && allocations().length > 0" class="alloc-table-wrap">
+        <table class="alloc-table">
+          <thead>
+            <tr>
+              <th>Task</th>
+              <th>Resource</th>
+              <th>Loại</th>
+              <th>%</th>
+              <th>Vai trò</th>
+              <th>Ngày</th>
+              <th>Over</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of allocations()">
+              <ng-container *ngIf="!row.editMode">
+                <td>
+                  <strong>{{ row.allocation.taskCode }}</strong>
+                  <div class="task-sub">{{ row.allocation.taskName }}</div>
+                </td>
+                <td>{{ row.allocation.resourceName }}</td>
+                <td><span class="type-chip">{{ typeLabels[row.allocation.resourceType] }}</span></td>
+                <td>{{ row.allocation.allocationPercent }}%</td>
+                <td>{{ row.allocation.roleOnTask || '—' }}</td>
+                <td class="dates">
+                  {{ row.allocation.startDate || '—' }} → {{ row.allocation.endDate || '—' }}
+                </td>
+                <td>
+                  <span class="over-chip" [class.over-yes]="row.allocation.overAllocation">
+                    {{ row.allocation.overAllocation ? `⚠ ${utilizationText(row.allocation.utilizationPercent)}` : 'Không' }}
+                  </span>
+                </td>
+                <td>
+                  <div *hasPermission="'plan:resource'" class="row-actions">
+                    <button (click)="editAllocation(row)" [disabled]="row.editBusy" class="btn-secondary btn-xs">✏️</button>
+                    <button (click)="unassign(row)" [disabled]="row.editBusy" class="btn-danger-soft btn-xs">🗑️</button>
+                  </div>
+                </td>
+              </ng-container>
+              <ng-container *ngIf="row.editMode">
+                <td colspan="8" class="edit-row">
+                  <div class="edit-inline">
+                    <label>%</label>
+                    <input
+                      id="alloc-pct-{{ row.allocation.id }}"
+                      type="number"
+                      min="1"
+                      max="100"
+                      class="form-control input-sm"
+                      [value]="row.allocation.allocationPercent"
+                    />
+                    <label>Vai trò</label>
+                    <input
+                      id="alloc-role-{{ row.allocation.id }}"
+                      type="text"
+                      class="form-control input-sm"
+                      [value]="row.allocation.roleOnTask || ''"
+                    />
+                    <label>Từ</label>
+                    <input
+                      id="alloc-start-{{ row.allocation.id }}"
+                      type="date"
+                      class="form-control input-sm"
+                      [value]="row.allocation.startDate || ''"
+                    />
+                    <label>Đến</label>
+                    <input
+                      id="alloc-end-{{ row.allocation.id }}"
+                      type="date"
+                      class="form-control input-sm"
+                      [value]="row.allocation.endDate || ''"
+                    />
+                    <button (click)="saveAllocation(row)" [disabled]="row.editBusy" class="btn-primary btn-xs">
+                      Lưu
+                    </button>
+                    <button (click)="cancelEditAllocation(row)" class="btn-secondary btn-xs">Hủy</button>
+                  </div>
+                  <div *ngIf="row.editError" class="edit-error">⚠️ {{ row.editError }}</div>
+                </td>
+              </ng-container>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ─── Workload ────────────────────────────────────────── -->
+    <div class="section-card">
+      <h4>Workload theo plan</h4>
+      <div class="wl-controls">
+        <label>Từ</label>
+        <input type="date" [(ngModel)]="workloadFrom" class="form-control input-sm" [ngModelOptions]="{standalone: true}" />
+        <label>Đến</label>
+        <input type="date" [(ngModel)]="workloadTo" class="form-control input-sm" [ngModelOptions]="{standalone: true}" />
+        <select [(ngModel)]="workloadGranularity" class="form-control input-sm" [ngModelOptions]="{standalone: true}">
+          <option *ngFor="let g of granularityKeys" [value]="g">{{ granularityLabels[g] }}</option>
+        </select>
+        <button (click)="loadPlanWorkload()" class="btn-primary btn-sm">Tra cứu</button>
+      </div>
+
+      <div *ngIf="workloadLoading()" class="loading-state">
+        <div class="spinner"></div>
+        <p>Đang tải workload...</p>
+      </div>
+      <div *ngIf="workloadError() && !workloadLoading()" class="alert alert-danger">⚠️ {{ workloadError() }}</div>
+
+      <app-empty-state
+        *ngIf="!workloadLoading() && !workloadError() && workload().length === 0"
+        title="Chưa có dữ liệu workload"
+        description="Gán resource vào task có planned dates (chạy Recalc nếu cần) rồi tra cứu."
+      >
+      </app-empty-state>
+
+      <div *ngIf="!workloadLoading() && !workloadError() && workload().length > 0" class="wl-summary">
+        <span>Tổng demand: <strong>{{ formatMinutes(workloadTotals().demand) }}</strong></span>
+        <span *ngIf="workloadTotals().capacity != null">
+          · Tổng capacity: <strong>{{ formatMinutes(workloadTotals().capacity!) }}</strong>
+        </span>
+      </div>
+
+      <div *ngFor="let w of workload()" class="wl-resource">
+        <div class="wl-res-header">
+          <strong>{{ w.resourceName }}</strong>
+          <span class="type-chip">{{ typeLabels[w.resourceType] }}</span>
+          <span class="util-chip" [class.over-yes]="w.overAllocation">
+            {{ w.overAllocation ? '⚠ Over-allocation' : `Utilization ${utilizationText(w.totalUtilizationPercent)}` }}
+          </span>
+        </div>
+        <div class="wl-table-wrap">
+          <table class="wl-table">
+            <thead>
+              <tr>
+                <th>Ngày</th>
+                <th>Demand</th>
+                <th>Capacity</th>
+                <th>Utilization</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let b of w.buckets">
+                <td>{{ b.date }}</td>
+                <td>{{ formatMinutes(b.demandMinutes) }}</td>
+                <td>{{ formatMinutes(b.capacityMinutes ?? 0) }}</td>
+                <td>
+                  <span class="util-chip" [class.over-yes]="b.overAllocation">
+                    {{ utilizationText(b.utilizationPercent) }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── Overview cross-plan ─────────────────────────────── -->
+    <div class="section-card">
+      <h4>Over-allocation cross-plan</h4>
+      <div class="wl-controls">
+        <label>Từ</label>
+        <input type="date" [(ngModel)]="workloadFrom" class="form-control input-sm" [ngModelOptions]="{standalone: true}" />
+        <label>Đến</label>
+        <input type="date" [(ngModel)]="workloadTo" class="form-control input-sm" [ngModelOptions]="{standalone: true}" />
+        <button (click)="loadOverview()" class="btn-primary btn-sm">Tra cứu</button>
+      </div>
+
+      <div *ngIf="overviewLoading()" class="loading-state">
+        <div class="spinner"></div>
+        <p>Đang tải tổng hợp...</p>
+      </div>
+      <div *ngIf="overviewError() && !overviewLoading()" class="alert alert-danger">⚠️ {{ overviewError() }}</div>
+
+      <app-empty-state
+        *ngIf="!overviewLoading() && !overviewError() && overview().length === 0"
+        title="Chưa có dữ liệu tổng hợp"
+        description="Tra cứu để xem demand/capacity của từng resource trên mọi plan (chỉ APPROVED/ACTIVE)."
+      >
+      </app-empty-state>
+
+      <div *ngIf="!overviewLoading() && !overviewError() && overview().length > 0" class="ov-table-wrap">
+        <table class="ov-table">
+          <thead>
+            <tr>
+              <th>Resource</th>
+              <th>Loại</th>
+              <th>Demand</th>
+              <th>Capacity</th>
+              <th>Utilization</th>
+              <th>Trạng thái</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let r of overview()">
+              <td><strong>{{ r.resourceName }}</strong></td>
+              <td><span class="type-chip">{{ typeLabels[r.resourceType] }}</span></td>
+              <td>{{ formatMinutes(r.demandMinutes) }}</td>
+              <td>{{ formatMinutes(r.capacityMinutes ?? 0) }}</td>
+              <td>{{ utilizationText(r.utilizationPercent) }}</td>
+              <td>
+                <span class="over-chip" [class.over-yes]="r.overAllocation">
+                  {{ r.overAllocation ? '⚠ Over' : 'OK' }}
+                </span>
+              </td>
+              <td>
+                <button
+                  *hasPermission="'plan:resource'"
+                  (click)="openCapacity(r)"
+                  class="btn-secondary btn-xs"
+                  title="Cập nhật capacity"
+                >⚙️ Capacity</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Capacity modal ────────────────────────────────────── -->
+  <div *ngIf="showCapacityModal()" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Cập nhật capacity — {{ capacityRow?.resourceName }}</h3>
+        <button (click)="closeCapacity()" class="close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div *ngIf="capacityError()" class="alert alert-danger">⚠️ {{ capacityError() }}</div>
+        <form [formGroup]="capacityForm" (ngSubmit)="updateCapacity()">
+          <div class="form-group">
+            <label>Capacity % <span class="req">*</span></label>
+            <input type="number" min="0" max="100" formControlName="capacityPercent" class="form-control" />
+            <small class="hint-text">0-100% so với giờ làm việc chuẩn (8h/ngày).</small>
+          </div>
+          <div class="form-group">
+            <label>Ngày áp dụng <span class="req">*</span></label>
+            <input type="date" formControlName="startDate" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label>Ngày kết thúc</label>
+            <input type="date" formControlName="endDate" class="form-control" />
+          </div>
+          <div class="modal-footer">
+            <button type="button" (click)="closeCapacity()" class="btn-secondary">Hủy</button>
+            <button type="submit" class="btn-primary" [disabled]="capacityBusy()">
+              <span *ngIf="!capacityBusy()">Lưu capacity</span>
+              <span *ngIf="capacityBusy()">Đang xử lý...</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

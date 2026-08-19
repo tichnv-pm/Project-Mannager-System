@@ -1,0 +1,250 @@
+<div class="plan-change">
+  <div class="ch-toolbar">
+    <h3>🔄 Change & Liên kết</h3>
+    <div class="ch-actions">
+      <ng-container *hasPermission="'plan:change'">
+        <button (click)="openCreateSuggestion()" class="btn-secondary btn-sm">📝 Đề xuất thay đổi</button>
+      </ng-container>
+      <ng-container *hasPermission="'plan:link'">
+        <button (click)="openCreateLink()" class="btn-primary btn-sm" [disabled]="!selectedTaskId()">🔗 Tạo liên kết</button>
+      </ng-container>
+    </div>
+  </div>
+
+  <div *ngIf="actionError()" class="alert alert-danger">⚠️ {{ actionError() }}</div>
+
+  <div *ngIf="loading()" class="loading-state">
+    <div class="spinner"></div>
+    <p>Đang tải...</p>
+  </div>
+
+  <div *ngIf="error() && !loading()" class="alert alert-danger">⚠️ {{ error() }}</div>
+
+  <div *ngIf="!loading() && !error()" class="ch-body">
+    <!-- Suggestions -->
+    <div class="section-card">
+      <h4>Change suggestions ({{ suggestions().length }})</h4>
+      <p class="hint">
+        Sau khi plan APPROVED, mọi đề xuất thay đổi lịch (từ Issue/Risk/Execution hoặc thủ công) cần được duyệt để áp dụng.
+        Effort plan ≥ 10.000 phút yêu cầu <strong>2 người duyệt</strong> (PM + ADMIN).
+      </p>
+      <app-empty-state
+        *ngIf="suggestions().length === 0"
+        title="Chưa có change suggestion"
+        description="Tạo suggestion để đề xuất thay đổi lịch (plannedStart/plannedFinish/duration/effort/progress/status) và chờ duyệt."
+      >
+      </app-empty-state>
+      <div *ngIf="suggestions().length > 0" class="suggestion-list">
+        <div *ngFor="let s of suggestions()" class="suggestion-row">
+          <div class="s-main">
+            <div class="s-head">
+              <strong>{{ s.title }}</strong>
+              <span class="status-chip" [class]="statusClass(s.status)">{{ statusLabels[s.status] }}</span>
+            </div>
+            <div class="s-desc">{{ s.description }}</div>
+            <div class="s-meta">
+              {{ s.createdAt | date:'dd/MM/yyyy HH:mm' }}
+              <span *ngIf="s.sourceType">· nguồn {{ s.sourceType }}{{ s.sourceId ? ' #' + s.sourceId.slice(0, 8) : '' }}</span>
+              <span *ngIf="s.reviewedAt">· duyệt 1: {{ s.reviewedAt | date:'dd/MM/yyyy HH:mm' }}</span>
+              <span *ngIf="s.reviewedAt2">· duyệt 2: {{ s.reviewedAt2 | date:'dd/MM/yyyy HH:mm' }}</span>
+            </div>
+          </div>
+          <div class="s-actions" *ngIf="s.status === 'PENDING'">
+            <ng-container *hasPermission="'plan:change'">
+              <button (click)="accept(s)" class="btn-success-soft btn-xs" [disabled]="busy()">✔ Duyệt</button>
+              <button (click)="reject(s)" class="btn-danger-soft btn-xs" [disabled]="busy()">✖ Từ chối</button>
+            </ng-container>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Plan links -->
+    <div class="section-card">
+      <h4>Liên kết planning task → Execution/Issue/Risk/Milestone</h4>
+      <p class="hint mb-2">💡 Chọn từng công việc WBS từ danh sách bên dưới để xem hoặc thêm mới các liên kết Thực thi (Execution Task), Issue, Risk hoặc Milestone tương ứng.</p>
+      <div class="link-picker">
+        <select class="form-control" [value]="selectedTaskId() || ''" (change)="selectTask($any($event.target).value)">
+          <option value="" disabled>-- Chọn WBS Task để xem danh sách liên kết --</option>
+          <option *ngFor="let t of tasks()" [value]="t.id">{{ t.wbsCode }} — {{ t.taskName }}</option>
+        </select>
+      </div>
+      <div *ngIf="linksLoading()" class="loading-state small">
+        <div class="spinner"></div>
+        <p>Đang tải links...</p>
+      </div>
+      <div *ngIf="linksError() && !linksLoading()" class="alert alert-danger">⚠️ {{ linksError() }}</div>
+      <app-empty-state
+        *ngIf="!selectedTaskId() && !linksLoading()"
+        title="Chưa chọn task"
+        description="Chọn một task ở trên để xem/cấu hình liên kết. Primary execution (tối đa 1/task) dùng cho roll-up thực tế."
+      >
+      </app-empty-state>
+      <app-empty-state
+        *ngIf="selectedTaskId() && !linksLoading() && !linksError() && links().length === 0"
+        title="Task này chưa có liên kết"
+        description="Nhấn 'Tạo liên kết' để nối task với execution task, issue, risk hoặc milestone."
+      >
+      </app-empty-state>
+      <div *ngIf="selectedTaskId() && !linksLoading() && !linksError() && links().length > 0" class="link-list">
+        <div *ngFor="let l of links()" class="link-row" [class.link-primary]="l.isPrimaryExecution">
+          <span class="link-type-chip">{{ linkTypeLabel(l.linkType) }}</span>
+          <span class="link-target">{{ targetTypeLabel(l.targetType) }}</span>
+          <span class="link-id">{{ l.targetId }}</span>
+          <span *ngIf="l.isPrimaryExecution" class="link-primary-badge">⭐ Primary execution</span>
+          <span *ngIf="l.note" class="link-note">{{ l.note }}</span>
+          <button *hasPermission="'plan:link'" (click)="deleteLink(l)" class="btn-danger-soft btn-xs">🗑️</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Change history -->
+    <div class="section-card">
+      <h4>Change history ({{ histories().length }})</h4>
+      <p class="hint">Chỉ ghi nhận sau khi plan APPROVED (PLN-RULE-CHG).</p>
+      <app-empty-state
+        *ngIf="histories().length === 0"
+        title="Chưa có change history"
+        description="Các thay đổi sau khi duyệt kế hoạch sẽ xuất hiện ở đây (field, giá trị cũ → mới, actor, thời gian)."
+      >
+      </app-empty-state>
+      <div *ngIf="histories().length > 0" class="history-wrap">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Thời gian</th>
+              <th>Loại</th>
+              <th>Entity</th>
+              <th>Field</th>
+              <th>Cũ → Mới</th>
+              <th>Ghi chú</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let h of histories()">
+              <td>{{ h.changedAt | date:'dd/MM/yyyy HH:mm' }}</td>
+              <td><span class="chg-type">{{ h.changeType }}</span></td>
+              <td>{{ h.entityType }}</td>
+              <td>{{ h.fieldChanged || '—' }}</td>
+              <td class="chg-val">{{ fmtVal(h.oldValue) }} → {{ fmtVal(h.newValue) }}</td>
+              <td>{{ h.reason || '—' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Suggestion modal ─────────────────────────────────────── -->
+  <div *ngIf="showSuggestionModal()" class="modal-backdrop">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h3>Đề xuất thay đổi (Change suggestion)</h3>
+        <button (click)="closeSuggestionModal()" class="close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <form [formGroup]="suggestionForm">
+          <div class="form-group">
+            <label>Tiêu đề <span class="req">*</span></label>
+            <input type="text" formControlName="title" class="form-control" maxlength="200" placeholder="VD: Trễ vì issue phát sinh" />
+          </div>
+          <div class="form-group">
+            <label>Mô tả <span class="req">*</span></label>
+            <textarea formControlName="description" rows="2" class="form-control" maxlength="1000"></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group col">
+              <label>Nguồn phát sinh</label>
+              <select formControlName="sourceType" class="form-control">
+                <option value="">Không có</option>
+                <option value="ISSUE">Issue</option>
+                <option value="RISK">Risk</option>
+                <option value="EXECUTION_TASK">Execution Task</option>
+                <option value="MANUAL">Thủ công</option>
+              </select>
+            </div>
+            <div class="form-group col">
+              <label>Source ID</label>
+              <input type="text" formControlName="sourceId" class="form-control" placeholder="UUID entity nguồn (nếu có)" />
+            </div>
+          </div>
+
+          <div class="chg-fields">
+            <div class="chg-fields-head">
+              <span>Thay đổi áp dụng lên PLAN_TASK</span>
+              <button type="button" (click)="addChangeField()" class="btn-secondary btn-xs">➕ Thêm field</button>
+            </div>
+            <div *ngFor="let row of changeFields(); let i = index" class="chg-row">
+              <select class="form-control" [value]="row.entityId" (change)="updateField(i, 'entityId', $any($event.target).value)">
+                <option value="">Chọn task...</option>
+                <option *ngFor="let t of tasks()" [value]="t.id">{{ t.wbsCode }} — {{ t.taskName }}</option>
+              </select>
+              <select class="form-control" [value]="row.field" (change)="updateField(i, 'field', $any($event.target).value)">
+                <option *ngFor="let f of fieldOptions" [value]="f">{{ fieldLabels[f] }}</option>
+              </select>
+              <input type="text" class="form-control" placeholder="Giá trị cũ" [value]="row.oldValue" (input)="updateField(i, 'oldValue', $any($event.target).value)" />
+              <input type="text" class="form-control" placeholder="Giá trị mới" [value]="row.newValue" (input)="updateField(i, 'newValue', $any($event.target).value)" />
+              <button type="button" (click)="removeChangeField(i)" class="btn-danger-soft btn-xs">✕</button>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" (click)="closeSuggestionModal()" class="btn-secondary">Hủy</button>
+            <button type="button" (click)="createSuggestion()" class="btn-primary" [disabled]="busy()">
+              <span *ngIf="!busy()">Gửi đề xuất</span>
+              <span *ngIf="busy()">Đang xử lý...</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Link modal ───────────────────────────────────────────── -->
+  <div *ngIf="showLinkModal()" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Tạo liên kết cho {{ selectedTaskId() ? taskLabel(selectedTaskId()!) : '' }}</h3>
+        <button (click)="closeLinkModal()" class="close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <form [formGroup]="linkForm">
+          <div class="form-row">
+            <div class="form-group col">
+              <label>Loại target <span class="req">*</span></label>
+              <select formControlName="targetType" class="form-control">
+                <option *ngFor="let key of targetLabels | keyvalue" [value]="key.key">{{ key.value }}</option>
+              </select>
+            </div>
+            <div class="form-group col">
+              <label>Loại link <span class="req">*</span></label>
+              <select formControlName="linkType" class="form-control">
+                <option *ngFor="let key of linkTypeLabels | keyvalue" [value]="key.key">{{ key.value }}</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Target ID <span class="req">*</span></label>
+            <input type="text" formControlName="targetId" class="form-control" placeholder="UUID của execution task / issue / risk / milestone" />
+            <small class="valid-hint">Ghi chú: BLOCKED_BY chỉ áp dụng cho Issue/Risk; thẻ primary chỉ cho Execution Task.</small>
+          </div>
+          <div class="form-group">
+            <label>Ghi chú</label>
+            <input type="text" formControlName="note" class="form-control" maxlength="500" />
+          </div>
+          <label class="checkbox-row">
+            <input type="checkbox" formControlName="isPrimaryExecution" />
+            ⭐ Đánh dấu Primary execution (tối đa 1/task, dùng cho roll-up thực tế)
+          </label>
+          <div class="modal-footer">
+            <button type="button" (click)="closeLinkModal()" class="btn-secondary">Hủy</button>
+            <button type="button" (click)="createLink()" class="btn-primary" [disabled]="busy()">
+              <span *ngIf="!busy()">Tạo liên kết</span>
+              <span *ngIf="busy()">Đang xử lý...</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

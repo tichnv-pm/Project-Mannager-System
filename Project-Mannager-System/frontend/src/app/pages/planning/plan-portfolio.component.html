@@ -1,0 +1,108 @@
+<div class="portfolio-page">
+  <app-page-header title="Portfolio" subtitle="Tổng quan đa dự án: tiến độ, trễ hạn, quá tải tài nguyên"></app-page-header>
+
+  <div *ngIf="loading()" class="loading-state">
+    <div class="spinner"></div>
+    <p>Đang tải portfolio...</p>
+  </div>
+
+  <div *ngIf="error() && !loading()" class="alert alert-danger">⚠️ {{ error() }}</div>
+
+  <div *ngIf="data() && !loading()" class="pf-body">
+    <!-- Summary cards -->
+    <div class="summary-grid">
+      <div class="stat-card">
+        <span class="stat-val">{{ data()!.totalProjects }}</span>
+        <span class="stat-label">Tổng dự án</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-val blue">{{ data()!.activeProjects }}</span>
+        <span class="stat-label">Đang triển khai (APPROVED/ACTIVE)</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-val red">{{ data()!.delayedProjects }}</span>
+        <span class="stat-label">Trễ hạn</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-val orange">{{ data()!.overAllocatedResourcesCount }}</span>
+        <span class="stat-label">Tài nguyên quá tải</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-val green">{{ round(data()!.averageProgress) }}</span>
+        <span class="stat-label">Tiến độ trung bình</span>
+      </div>
+    </div>
+
+    <!-- Projects table -->
+    <div class="section-card">
+      <h4>Dự án ({{ data()!.projects.length }})</h4>
+      <app-empty-state
+        *ngIf="data()!.projects.length === 0"
+        title="Chưa có dữ liệu dự án"
+        description="Portfolio tổng hợp từ các plan APPROVED/ACTIVE của dự án."
+      >
+      </app-empty-state>
+      <div *ngIf="data()!.projects.length > 0" class="table-wrap">
+        <table class="pf-table">
+          <thead>
+            <tr>
+              <th>Dự án</th>
+              <th>PM</th>
+              <th>Trạng thái</th>
+              <th>Kế hoạch</th>
+              <th>Tiến độ</th>
+              <th>Độ trễ</th>
+              <th>Găng</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let p of data()!.projects">
+              <td>
+                <a class="link" [routerLink]="p.activePlanId ? ['/plans', p.activePlanId] : ['/projects', p.id]">
+                  {{ p.code }} — {{ p.name }}
+                </a>
+              </td>
+              <td>{{ p.pmName || '—' }}</td>
+              <td><span class="st-chip">{{ p.status }}</span></td>
+              <td class="daterange">{{ p.plannedStart || '—' }} → {{ p.plannedFinish || '—' }}</td>
+              <td>
+                <div class="mini-progress">
+                  <div class="mini-bar-bg"><div class="mini-bar" [style.width.%]="p.progress ?? 0"></div></div>
+                  <span>{{ round(p.progress) }}</span>
+                </div>
+              </td>
+              <td>
+                <span class="delay-chip" [class.zero]="!p.delayDays" [class.hide]="p.delayDays == null">
+                  {{ p.delayDays != null && p.delayDays > 0 ? '⏰ +' + p.delayDays + ' ngày' : 'Đúng hạn' }}
+                </span>
+              </td>
+              <td>
+                <span class="critical-chip" *ngIf="(p.criticalTaskCount ?? 0) > 0">🧵 {{ p.criticalTaskCount }} task găng</span>
+                <span class="over-chip" *ngIf="p.isOverAllocated">⚠ Quá tải</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Upcoming milestones -->
+    <div class="section-card">
+      <h4>Milestone sắp tới ({{ data()!.upcomingMilestones.length }})</h4>
+      <app-empty-state
+        *ngIf="data()!.upcomingMilestones.length === 0"
+        title="Không có milestone sắp tới"
+        description="Các milestone trong 30 ngày tới của các dự án."
+      >
+      </app-empty-state>
+      <div *ngIf="data()!.upcomingMilestones.length > 0" class="ms-list">
+        <div *ngFor="let m of data()!.upcomingMilestones" class="ms-row">
+          <span class="ms-date">{{ m.targetDate }}</span>
+          <span class="ms-name">{{ m.name }}</span>
+          <span class="ms-project">{{ m.projectName }}</span>
+          <span class="ms-status">{{ m.status }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

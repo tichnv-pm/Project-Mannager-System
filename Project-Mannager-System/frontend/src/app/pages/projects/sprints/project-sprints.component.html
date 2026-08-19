@@ -1,0 +1,185 @@
+<div class="sprints-tab-container">
+  <div class="header-actions">
+    <h3>Quản lý Agile/Sprints</h3>
+    <button *hasPermission="'project:update'" (click)="openCreateModal()" class="btn-primary">
+      ➕ Tạo Sprint mới
+    </button>
+  </div>
+
+  <!-- Loading & Error States -->
+  <div *ngIf="loading()" class="loading-state">
+    <div class="spinner"></div>
+    <p>Đang tải dữ liệu Sprint...</p>
+  </div>
+
+  <div *ngIf="error() && !loading()" class="error-state">
+    <p>⚠️ {{ error() }}</p>
+    <button (click)="loadAllData()" class="btn-secondary">Tải lại</button>
+  </div>
+
+  <!-- Main Drag & Drop Container -->
+  <div *ngIf="!loading() && !error()" class="planning-workspace" cdkDropListGroup>
+    
+    <!-- Left Column: Sprints -->
+    <div class="sprints-column">
+      <h4>Danh sách Sprint</h4>
+      
+      <div *ngIf="sprints().length === 0" class="no-sprints-placeholder">
+        <p>Dự án chưa có Sprint nào. Hãy bấm nút tạo để bắt đầu lập kế hoạch.</p>
+      </div>
+
+      <div *ngFor="let sprint of sprints()" class="sprint-card" [ngClass]="sprint.status.toLowerCase()">
+        <div class="sprint-header">
+          <div class="title-status">
+            <span class="sprint-title bold">{{ sprint.sprintName }}</span>
+            <span class="sprint-status-badge">{{ sprint.status }}</span>
+          </div>
+          
+          <div class="sprint-dates">
+            📅 {{ sprint.startDate | date:'dd/MM/yyyy' }} - {{ sprint.endDate | date:'dd/MM/yyyy' }}
+          </div>
+        </div>
+
+        <div *ngIf="sprint.goal" class="sprint-goal">
+          🎯 <strong>Mục tiêu:</strong> {{ sprint.goal }}
+        </div>
+
+        <!-- Capacity Load -->
+        <div class="sprint-capacity">
+          <div class="cap-header">
+            <span>Khối lượng công việc:</span>
+            <span>{{ getSprintTasks(sprint.id).length }} công việc</span>
+          </div>
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" [style.width.%]="getSprintTasks(sprint.id).length * 10 > 100 ? 100 : getSprintTasks(sprint.id).length * 10"></div>
+          </div>
+        </div>
+
+        <!-- Droppable Task List -->
+        <div 
+          cdkDropList 
+          [cdkDropListData]="getSprintTasks(sprint.id)" 
+          (cdkDropListDropped)="onDrop($event, sprint.id)" 
+          class="drop-list-zone"
+        >
+          <div *ngIf="getSprintTasks(sprint.id).length === 0" class="empty-drop-placeholder">
+            Thả công việc vào đây để gán vào Sprint
+          </div>
+
+          <div *ngFor="let task of getSprintTasks(sprint.id)" cdkDrag class="task-drag-card">
+            <div class="task-top">
+              <span class="task-code">{{ task.code }}</span>
+              <span class="task-priority-badge" [ngClass]="task.priority.toLowerCase()">{{ task.priority }}</span>
+            </div>
+            <div class="task-title">{{ task.title }}</div>
+            <div class="task-footer">
+              <span class="task-status">{{ task.status }}</span>
+              <span *ngIf="task.assignee" class="task-assignee">👤 {{ task.assignee.fullName }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sprint Operations -->
+        <div class="sprint-actions">
+          <button 
+            *ngIf="sprint.status === 'FUTURE'" 
+            (click)="startSprint(sprint)" 
+            class="btn-action-start"
+          >
+            🚀 Bắt đầu Sprint
+          </button>
+          <button 
+            *ngIf="sprint.status === 'ACTIVE'" 
+            (click)="closeSprint(sprint)" 
+            class="btn-action-close"
+          >
+            🏁 Đóng Sprint
+          </button>
+          <button 
+            *ngIf="sprint.status !== 'ACTIVE'" 
+            (click)="deleteSprint(sprint)" 
+            class="btn-action-delete"
+            title="Xóa Sprint"
+          >
+            🗑️ Xóa
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Backlog -->
+    <div class="backlog-column">
+      <h4>📋 Product Backlog (Chưa gán)</h4>
+      
+      <div 
+        cdkDropList 
+        [cdkDropListData]="backlogTasks()" 
+        (cdkDropListDropped)="onDrop($event, null)" 
+        class="drop-list-zone backlog-zone"
+      >
+        <div *ngIf="backlogTasks().length === 0" class="empty-drop-placeholder">
+          Không có công việc nào trong Backlog
+        </div>
+
+        <div *ngFor="let task of backlogTasks()" cdkDrag class="task-drag-card">
+          <div class="task-top">
+            <span class="task-code">{{ task.code }}</span>
+            <span class="task-priority-badge" [ngClass]="task.priority.toLowerCase()">{{ task.priority }}</span>
+          </div>
+          <div class="task-title">{{ task.title }}</div>
+          <div class="task-footer">
+            <span class="task-status">{{ task.status }}</span>
+            <span *ngIf="task.assignee" class="task-assignee">👤 {{ task.assignee.fullName }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Create Sprint Modal -->
+  <div *ngIf="showCreateModal()" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Tạo Sprint mới</h3>
+        <button (click)="closeCreateModal()" class="close-btn">✕</button>
+      </div>
+
+      <div *ngIf="formError()" class="alert alert-danger">
+        ⚠️ {{ formError() }}
+      </div>
+
+      <form [formGroup]="sprintForm" (ngSubmit)="createSprint()" class="modal-body">
+        <div class="form-group">
+          <label>Tên Sprint <span class="req">*</span></label>
+          <input type="text" formControlName="sprintName" class="form-control" placeholder="Ví dụ: Sprint 1: Bootstrap">
+          <small *ngIf="sprintForm.get('sprintName')?.touched && sprintForm.get('sprintName')?.invalid" class="invalid">Tên Sprint là bắt buộc (tối đa 100 ký tự)</small>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col">
+            <label>Ngày bắt đầu <span class="req">*</span></label>
+            <input type="date" formControlName="startDate" class="form-control">
+          </div>
+          <div class="form-group col">
+            <label>Ngày kết thúc <span class="req">*</span></label>
+            <input type="date" formControlName="endDate" class="form-control">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Mục tiêu Sprint</label>
+          <textarea formControlName="goal" class="form-control" rows="3" placeholder="Nhập mục tiêu chính của đợt chạy này..."></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" (click)="closeCreateModal()" class="btn-secondary">Hủy</button>
+          <button type="submit" class="btn-primary" [disabled]="formSubmitting()">
+            <span *ngIf="!formSubmitting()">Tạo Sprint</span>
+            <span *ngIf="formSubmitting()">Đang xử lý...</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,234 @@
+<div class="project-detail-page">
+  <div class="back-link">
+    <a routerLink="/projects">← Quay lại danh sách dự án</a>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading()" class="loading-state">
+    <div class="spinner"></div>
+    <p>Đang tải chi tiết dự án...</p>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="error() && !loading()" class="error-state">
+    <p>⚠️ {{ error() }}</p>
+    <a routerLink="/projects" class="btn-primary">Quay lại</a>
+  </div>
+
+  <!-- Content -->
+  <div *ngIf="!loading() && project()" class="detail-container">
+    <app-page-header [title]="project()?.name || ''" [subtitle]="'Mã dự án: ' + project()?.code">
+      <app-status-chip [status]="project()?.status || ''"></app-status-chip>
+    </app-page-header>
+
+    <!-- Tabs Header -->
+    <div class="tabs-header">
+      <button class="tab-btn" [class.active]="activeTab === 'overview'" (click)="activeTab = 'overview'">
+        📌 Tổng quan Dự án
+      </button>
+      <button class="tab-btn" [class.active]="activeTab === 'members'" (click)="activeTab = 'members'">
+        👥 Thành viên Dự án ({{ members().length }})
+      </button>
+      <button class="tab-btn" [class.active]="activeTab === 'wiki'" (click)="activeTab = 'wiki'">
+        📖 Wiki Dự án
+      </button>
+      <button class="tab-btn" [class.active]="activeTab === 'sprints'" (click)="activeTab = 'sprints'">
+        🔄 Agile/Sprints
+      </button>
+      <button class="tab-btn" [class.active]="activeTab === 'qa'" (click)="activeTab = 'qa'">
+        🛡️ Chất lượng QA
+      </button>
+      <button *hasPermission="'financial:view'" class="tab-btn" [class.active]="activeTab === 'finance'" (click)="activeTab = 'finance'">
+        💰 Tài chính & EVM
+      </button>
+    </div>
+
+    <!-- Tab 1: Overview -->
+    <div *ngIf="activeTab === 'overview'" class="tab-content">
+      <div class="overview-grid">
+        <div class="info-card">
+          <h3>Thông tin cơ bản</h3>
+          <div class="info-list">
+            <div class="info-row">
+              <span class="label">Mã dự án:</span>
+              <span class="val bold blue">{{ project()?.code }}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Khách hàng:</span>
+              <span class="val">{{ project()?.customerName || 'N/A' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Quản lý dự án:</span>
+              <span class="val bold">{{ project()?.projectManagerName || 'Chưa gán' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Ngày bắt đầu:</span>
+              <span class="val">{{ project()?.startDate || 'N/A' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Ngày kết thúc:</span>
+              <span class="val">{{ project()?.endDate || 'N/A' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-card">
+          <h3>Tiến độ & Thành viên</h3>
+          <div class="progress-box">
+            <div class="p-header">
+              <span>Tiến độ tổng thể</span>
+              <span class="p-val">{{ project()?.progress }}%</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" [style.width.%]="project()?.progress"></div>
+            </div>
+          </div>
+
+          <div class="info-list margin-top">
+            <div class="info-row">
+              <span class="label">Tổng số thành viên:</span>
+              <span class="val bold">{{ project()?.memberCount }} người</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Ngày tạo:</span>
+              <span class="val">{{ project()?.createdAt | date:'dd/MM/yyyy HH:mm' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-card full-col">
+          <h3>Mô tả chi tiết</h3>
+          <p class="desc-text">{{ project()?.description || 'Không có mô tả chi tiết cho dự án này.' }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Members Management -->
+    <div *ngIf="activeTab === 'members'" class="tab-content">
+      <div class="members-toolbar">
+        <h3>Danh sách Thành viên ({{ members().length }})</h3>
+        <button *hasPermission="'project-member:manage'" (click)="openAddMemberModal()" class="btn-primary">
+          ➕ Thêm thành viên
+        </button>
+      </div>
+
+      <div class="table-card">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Họ và tên</th>
+              <th>Tên đăng nhập</th>
+              <th>Email</th>
+              <th>Vai trò trong dự án</th>
+              <th>Ngày tham gia</th>
+              <th *hasPermission="'project-member:manage'">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let m of members()">
+              <td>
+                <div class="member-user">
+                  <div class="avatar">{{ m.fullName ? m.fullName[0].toUpperCase() : 'U' }}</div>
+                  <span class="name">{{ m.fullName || m.username }}</span>
+                </div>
+              </td>
+              <td><code>{{ m.username }}</code></td>
+              <td>{{ m.email }}</td>
+              <td>
+                <select
+                  *hasPermission="'project-member:manage'"
+                  [value]="m.role"
+                  (change)="onChangeRole(m, $event)"
+                  class="role-select"
+                >
+                  <option value="PROJECT_MANAGER">Quản lý dự án (PM)</option>
+                  <option value="DEV">Lập trình viên (DEV)</option>
+                  <option value="TESTER">Kiểm thử viên (TESTER)</option>
+                  <option value="BA">Phân tích nghiệp vụ (BA)</option>
+                  <option value="DEVOPS">Kỹ sư DevOps</option>
+                  <option value="DESIGNER">Thiết kế (DESIGNER)</option>
+                  <option value="PROJECT_MEMBER">Thành viên</option>
+                </select>
+                <span *ngIf="!authService.hasPermission('project-member:manage')" class="role-badge">
+                  {{ getRoleLabel(m.role) }}
+                </span>
+              </td>
+              <td>{{ m.joinedAt | date:'dd/MM/yyyy' }}</td>
+              <td *hasPermission="'project-member:manage'">
+                <button (click)="removeMember(m)" class="btn-icon-danger" title="Xóa khỏi dự án">🗑️</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    
+    <!-- Tab 3: Wiki -->
+    <div *ngIf="activeTab === 'wiki'" class="tab-content">
+      <app-project-wiki [projectId]="project()!.id"></app-project-wiki>
+    </div>
+
+    <!-- Tab: Sprints -->
+    <div *ngIf="activeTab === 'sprints'" class="tab-content">
+      <app-project-sprints [projectId]="project()!.id"></app-project-sprints>
+    </div>
+
+    <!-- Tab: QA -->
+    <div *ngIf="activeTab === 'qa'" class="tab-content">
+      <app-project-qa [projectId]="project()!.id"></app-project-qa>
+    </div>
+    
+    <!-- Tab: Finance -->
+    <div *ngIf="activeTab === 'finance'" class="tab-content">
+      <app-project-finance [projectId]="project()!.id"></app-project-finance>
+    </div>
+  </div>
+
+  <!-- Add Member Modal -->
+  <div *ngIf="showMemberModal()" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Thêm thành viên vào dự án</h3>
+        <button (click)="closeMemberModal()" class="close-btn">✕</button>
+      </div>
+
+      <div *ngIf="memberFormError()" class="alert alert-danger">
+        ⚠️ {{ memberFormError() }}
+      </div>
+
+      <form [formGroup]="memberForm" (ngSubmit)="addMember()" class="modal-body">
+        <div class="form-group">
+          <label>Chọn thành viên <span class="req">*</span></label>
+          <select formControlName="userId" class="form-control">
+            <option value="">-- Chọn thành viên --</option>
+            <option *ngFor="let u of usersList()" [value]="u.id">
+              {{ u.fullName || u.username }} ({{ u.email }})
+            </option>
+          </select>
+          <small *ngIf="memberForm.get('userId')?.touched && memberForm.get('userId')?.invalid" class="invalid">Vui lòng chọn thành viên</small>
+        </div>
+
+        <div class="form-group">
+          <label>Vai trò trong dự án <span class="req">*</span></label>
+          <select formControlName="role" class="form-control">
+            <option value="PROJECT_MANAGER">Quản lý dự án (PM)</option>
+            <option value="DEV">Lập trình viên (DEV)</option>
+            <option value="TESTER">Kiểm thử viên (TESTER)</option>
+            <option value="BA">Phân tích nghiệp vụ (BA)</option>
+            <option value="DEVOPS">Kỹ sư DevOps</option>
+            <option value="DESIGNER">Thiết kế (DESIGNER)</option>
+            <option value="PROJECT_MEMBER">Thành viên</option>
+          </select>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" (click)="closeMemberModal()" class="btn-secondary">Hủy</button>
+          <button type="submit" class="btn-primary" [disabled]="memberFormSubmitting()">
+            <span *ngIf="!memberFormSubmitting()">Thêm thành viên</span>
+            <span *ngIf="memberFormSubmitting()">Đang xử lý...</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

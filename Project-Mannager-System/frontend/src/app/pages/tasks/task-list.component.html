@@ -1,0 +1,468 @@
+<div class="tasks-page">
+  <app-page-header
+    title="Quản lý Công việc"
+    subtitle="Theo dõi tiến độ, giao việc, Kanban board và chuyển đổi trạng thái công việc"
+  >
+    <div class="header-actions">
+      <!-- View Toggle -->
+      <div class="view-toggle">
+        <button [class.active]="viewMode() === 'table'" (click)="viewMode.set('table')" class="btn-toggle" title="Chế độ bảng">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          Bảng
+        </button>
+        <button [class.active]="viewMode() === 'kanban'" (click)="viewMode.set('kanban')" class="btn-toggle" title="Kanban Board">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="5" height="18"/><rect x="10" y="3" width="5" height="11"/><rect x="17" y="3" width="5" height="15"/></svg>
+          Kanban
+        </button>
+      </div>
+
+      <button (click)="exportExcel()" class="btn-secondary" title="Xuất Excel theo bộ lọc hiện tại">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Xuất Excel
+      </button>
+
+      <button *hasPermission="'task:create'" (click)="openCreateModal()" class="btn-primary" id="btn-create-task">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Tạo mới
+      </button>
+    </div>
+  </app-page-header>
+
+  <!-- Quick Filter Pills -->
+  <div class="quick-filters">
+    <button id="qf-all"      [class.active]="quickFilter() === 'all'"      (click)="setQuickFilter('all')"      class="chip-filter">Tất cả</button>
+    <button id="qf-my-tasks" [class.active]="quickFilter() === 'my-tasks'" (click)="setQuickFilter('my-tasks')" class="chip-filter">👤 Việc của tôi</button>
+    <button id="qf-today"    [class.active]="quickFilter() === 'today'"    (click)="setQuickFilter('today')"    class="chip-filter">📅 Hạn hôm nay</button>
+    <button id="qf-overdue"  [class.active]="quickFilter() === 'overdue'"  (click)="setQuickFilter('overdue')"  class="chip-filter danger">🚨 Quá hạn</button>
+    <button id="qf-blocked"  [class.active]="quickFilter() === 'blocked'"  (click)="setQuickFilter('blocked')"  class="chip-filter warn">🚧 Bị tắc nghẽn</button>
+  </div>
+
+  <!-- Filter Toolbar -->
+  <div class="filter-toolbar">
+    <!-- Search -->
+    <div class="search-box">
+      <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input
+        id="task-search"
+        type="text"
+        [(ngModel)]="keyword"
+        (ngModelChange)="onKeywordChange()"
+        placeholder="Tìm kiếm mã task, tiêu đề..."
+        class="form-control search-input"
+      />
+    </div>
+
+    <!-- Project -->
+    <div class="filter-group">
+      <label class="filter-label">Dự án</label>
+      <select id="filter-project" [(ngModel)]="selectedProjectId" (change)="onFilterChange()" class="form-control">
+        <option value="">Tất cả dự án</option>
+        <option *ngFor="let p of projectsList()" [value]="p.id">[{{ p.code }}] {{ p.name }}</option>
+      </select>
+    </div>
+
+    <!-- Assignee -->
+    <div class="filter-group">
+      <label class="filter-label">Người thực hiện</label>
+      <select id="filter-assignee" [(ngModel)]="selectedAssigneeId" (change)="onFilterChange()" class="form-control">
+        <option value="">Tất cả</option>
+        <option *ngFor="let u of usersList()" [value]="u.id">{{ u.fullName || u.username }}</option>
+      </select>
+    </div>
+
+    <!-- Status Multi -->
+    <div class="filter-group">
+      <label class="filter-label">Trạng thái</label>
+      <div class="multi-chip-select">
+        <button
+          *ngFor="let s of statusOptions"
+          [class.selected]="selectedStatuses.includes(s)"
+          (click)="toggleStatus(s)"
+          class="mini-chip"
+          [id]="'filter-status-' + s"
+        >{{ getStatusLabel(s) }}</button>
+      </div>
+    </div>
+
+    <!-- Priority Multi -->
+    <div class="filter-group">
+      <label class="filter-label">Ưu tiên</label>
+      <div class="multi-chip-select">
+        <button
+          *ngFor="let p of priorityOptions"
+          [class.selected]="selectedPriorities.includes(p)"
+          (click)="togglePriority(p)"
+          class="mini-chip priority-chip-mini"
+          [id]="'filter-priority-' + p"
+        >{{ getPriorityIcon(p) }} {{ p }}</button>
+      </div>
+    </div>
+
+    <!-- Date Range -->
+    <div class="filter-group date-range-group">
+      <label class="filter-label">Hạn chót</label>
+      <div class="date-range">
+        <input type="date" [(ngModel)]="dueDateFrom" (change)="onFilterChange()" class="form-control date-input" id="filter-due-from" />
+        <span class="date-sep">→</span>
+        <input type="date" [(ngModel)]="dueDateTo" (change)="onFilterChange()" class="form-control date-input" id="filter-due-to" />
+      </div>
+    </div>
+
+    <!-- Checkboxes -->
+    <div class="filter-checks">
+      <label class="check-label">
+        <input type="checkbox" [(ngModel)]="filterOverdue" (change)="onFilterChange()" id="filter-overdue-check" />
+        🔴 Quá hạn
+      </label>
+      <label class="check-label">
+        <input type="checkbox" [(ngModel)]="filterBlocked" (change)="onFilterChange()" id="filter-blocked-check" />
+        🚧 Bị tắc
+      </label>
+    </div>
+
+    <!-- Reset -->
+    <button *ngIf="hasActiveFilters()" (click)="resetFilter()" class="btn-reset" id="btn-reset-filter">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      Xóa bộ lọc
+    </button>
+  </div>
+
+  <!-- Result Summary -->
+  <div class="result-summary" *ngIf="!loading()">
+    <span class="count-badge">{{ totalElements() }} công việc</span>
+    <span *ngIf="hasActiveFilters()" class="filter-active-badge">🔍 Đang lọc</span>
+  </div>
+
+  <!-- Loading -->
+  <div *ngIf="loading()" class="loading-state">
+    <div class="spinner"></div>
+    <p>Đang tải danh sách công việc...</p>
+  </div>
+
+  <!-- Error -->
+  <div *ngIf="error() && !loading()" class="error-state">
+    <p>⚠️ {{ error() }}</p>
+    <button (click)="loadTasks()" class="btn-secondary">Thử lại</button>
+  </div>
+
+  <!-- Empty -->
+  <app-empty-state
+    *ngIf="!loading() && !error() && tasks().length === 0"
+    title="Không tìm thấy công việc nào"
+    description="Thử thay đổi bộ lọc tìm kiếm hoặc tạo mới một công việc để bắt đầu."
+  >
+    <button *hasPermission="'task:create'" (click)="openCreateModal()" class="btn-primary">Tạo công việc mới</button>
+  </app-empty-state>
+
+  <!-- ═══════════════ TABLE VIEW ═══════════════ -->
+  <div *ngIf="!loading() && !error() && tasks().length > 0 && viewMode() === 'table'" class="table-card">
+    <table class="data-table" id="task-table">
+      <thead>
+        <tr>
+          <th>Mã task</th>
+          <th>Tên công việc</th>
+          <th>Dự án</th>
+          <th>Người thực hiện</th>
+          <th>Loại</th>
+          <th>Ưu tiên</th>
+          <th>Trạng thái</th>
+          <th>Tiến độ</th>
+          <th>Hạn chót</th>
+          <th>Thao tác</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let t of tasks()" [class.row-overdue]="isOverdue(t)" [class.row-blocked]="t.blocked">
+          <td>
+            <code class="task-code">{{ t.code }}</code>
+          </td>
+          <td class="task-title-cell">
+            <a [routerLink]="['/tasks', t.id]" class="task-title-link">{{ t.title }}</a>
+            <div *ngIf="t.blocked && t.blockerReason" class="blocker-badge">
+              🚧 {{ t.blockerReason | slice:0:60 }}{{ (t.blockerReason?.length ?? 0) > 60 ? '...' : '' }}
+            </div>
+            <div class="task-meta-mini">
+              <span *ngIf="t.commentCount > 0" class="meta-icon" title="Bình luận">💬 {{ t.commentCount }}</span>
+              <span *ngIf="t.attachmentCount > 0" class="meta-icon" title="Đính kèm">📎 {{ t.attachmentCount }}</span>
+            </div>
+          </td>
+          <td><span class="prj-tag">[{{ t.projectCode }}] {{ t.projectName }}</span></td>
+          <td>
+            <span *ngIf="t.assigneeName" class="user-chip">
+              <span class="user-avatar">{{ t.assigneeName[0] }}</span>
+              {{ t.assigneeName }}
+            </span>
+            <span *ngIf="!t.assigneeName" class="unassigned">—</span>
+          </td>
+          <td><span class="type-badge type-{{ t.type | lowercase }}">{{ t.type }}</span></td>
+          <td><app-priority-chip [priority]="t.priority"></app-priority-chip></td>
+          <td><app-status-chip [status]="t.status"></app-status-chip></td>
+          <td>
+            <div class="progress-mini">
+              <div class="progress-bar-track">
+                <div class="progress-bar-fill" [style.width.%]="t.progress" [style.background]="getProgressColor(t.progress)"></div>
+              </div>
+              <span class="progress-text">{{ t.progress }}%</span>
+            </div>
+          </td>
+          <td>
+            <span [class.overdue-text]="isOverdue(t)">
+              {{ t.dueDate || '—' }}
+              <span *ngIf="isOverdue(t)" class="overdue-label">Quá hạn</span>
+            </span>
+          </td>
+          <td>
+            <div class="table-actions">
+              <a [routerLink]="['/tasks', t.id]" class="btn-icon" title="Xem chi tiết" [id]="'view-task-' + t.id">👁️</a>
+              <button *hasPermission="'task:update'" (click)="openEditModal(t)" class="btn-icon" title="Chỉnh sửa" [id]="'edit-task-' + t.id">✏️</button>
+              <button *hasPermission="'task:update'" (click)="openStatusModal(t)" class="btn-icon" title="Chuyển trạng thái" [id]="'status-task-' + t.id">🔄</button>
+              <button *hasPermission="'task:delete'" (click)="openDeleteModal(t)" class="btn-icon-danger" title="Xóa" [id]="'delete-task-' + t.id">🗑️</button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ═══════════════ KANBAN VIEW ═══════════════ -->
+  <div *ngIf="!loading() && !error() && viewMode() === 'kanban'" class="kanban-board" id="kanban-board">
+    <div *ngFor="let col of kanbanColumns" class="kanban-col">
+      <div class="col-header" [ngClass]="col.cls">
+        <span>{{ col.icon }} {{ col.label }}</span>
+        <span class="col-count">{{ getKanbanTasks(col.key).length }}</span>
+      </div>
+      <div class="col-body">
+        <div *ngIf="getKanbanTasks(col.key).length === 0" class="kanban-empty">
+          Không có công việc
+        </div>
+        <div *ngFor="let t of getKanbanTasks(col.key)" class="kanban-card" [class.blocked-card]="t.blocked">
+          <div class="card-head">
+            <code class="task-code-mini">{{ t.code }}</code>
+            <app-priority-chip [priority]="t.priority"></app-priority-chip>
+          </div>
+          <a [routerLink]="['/tasks', t.id]" class="card-title">{{ t.title }}</a>
+          <div *ngIf="t.blocked && t.blockerReason" class="card-blocker">🚧 {{ t.blockerReason | slice:0:50 }}...</div>
+          <div class="card-progress">
+            <div class="progress-bar-track">
+              <div class="progress-bar-fill" [style.width.%]="t.progress" [style.background]="getProgressColor(t.progress)"></div>
+            </div>
+            <span class="progress-text">{{ t.progress }}%</span>
+          </div>
+          <div class="card-foot">
+            <span class="card-assignee">
+              <span *ngIf="t.assigneeName" class="user-avatar-mini">{{ t.assigneeName[0] }}</span>
+              {{ t.assigneeName || 'Chưa gán' }}
+            </span>
+            <div class="card-actions">
+              <span class="card-meta-count" *ngIf="t.commentCount > 0">💬{{ t.commentCount }}</span>
+              <button
+                *ngIf="getNextStatus(col.key)"
+                (click)="openStatusModal(t, getNextStatus(col.key)!)"
+                class="btn-step"
+                [id]="'kanban-step-' + t.id"
+              >{{ getNextStatusLabel(col.key) }} →</button>
+            </div>
+          </div>
+          <div *ngIf="t.dueDate" class="card-due" [class.overdue-text]="isOverdue(t)">
+            📅 {{ t.dueDate }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ PAGINATION ═══════════════ -->
+  <div *ngIf="!loading() && totalPages() > 1" class="pagination" id="task-pagination">
+    <button (click)="goToPage(page - 1)" [disabled]="page === 0" class="page-btn">←</button>
+    <button
+      *ngFor="let p of pages"
+      (click)="goToPage(p)"
+      [class.active]="p === page"
+      class="page-btn"
+      [id]="'page-' + p"
+    >{{ p + 1 }}</button>
+    <button (click)="goToPage(page + 1)" [disabled]="page >= totalPages() - 1" class="page-btn">→</button>
+    <span class="page-info">Trang {{ page + 1 }}/{{ totalPages() }} ({{ totalElements() }} task)</span>
+  </div>
+
+  <!-- ═══════════════ MODAL: Create / Edit ═══════════════ -->
+  <div *ngIf="showModal()" class="modal-backdrop" (click)="closeModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()" id="task-form-modal">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-icon">{{ isEditMode() ? '✏️' : '➕' }}</span>
+          <h3>{{ isEditMode() ? 'Cập nhật Công việc' : 'Tạo mới Công việc' }}</h3>
+        </div>
+        <button (click)="closeModal()" class="close-btn" id="modal-close-task">✕</button>
+      </div>
+
+      <div *ngIf="formError()" class="alert alert-danger">⚠️ {{ formError() }}</div>
+
+      <form [formGroup]="taskForm" (ngSubmit)="saveTask()" class="modal-body">
+        <div class="form-row">
+          <div class="form-group flex-2">
+            <label>Dự án <span class="req">*</span></label>
+            <select formControlName="projectId" class="form-control" id="form-project-id" [disabled]="isEditMode()">
+              <option value="">-- Chọn dự án --</option>
+              <option *ngFor="let p of projectsList()" [value]="p.id">[{{ p.code }}] {{ p.name }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Loại</label>
+            <select formControlName="type" class="form-control" id="form-task-type">
+              <option value="TASK">📋 Công việc</option>
+              <option value="FEATURE">✨ Tính năng</option>
+              <option value="BUG">🐛 Lỗi</option>
+              <option value="IMPROVEMENT">⬆️ Cải tiến</option>
+              <option value="OTHER">📦 Khác</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Tiêu đề công việc <span class="req">*</span></label>
+          <input type="text" formControlName="title" id="form-task-title"
+            placeholder="VD: Triển khai giao diện LoginPage" class="form-control" />
+          <span *ngIf="taskForm.get('title')?.invalid && taskForm.get('title')?.touched" class="invalid">
+            Tiêu đề là bắt buộc, tối đa 200 ký tự.
+          </span>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Mức độ ưu tiên</label>
+            <select formControlName="priority" class="form-control" id="form-task-priority">
+              <option value="LOW">🟢 Thấp (LOW)</option>
+              <option value="MEDIUM">🟡 Trung bình (MEDIUM)</option>
+              <option value="HIGH">🟠 Cao (HIGH)</option>
+              <option value="URGENT">🔴 Khẩn cấp (URGENT)</option>
+              <option value="CRITICAL">🚨 Nghiêm trọng (CRITICAL)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Người thực hiện</label>
+            <select formControlName="assigneeId" class="form-control" id="form-task-assignee">
+              <option value="">— Chưa gán —</option>
+              <option *ngFor="let u of usersList()" [value]="u.id">{{ u.fullName || u.username }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Ngày bắt đầu</label>
+            <input type="date" formControlName="startDate" class="form-control" id="form-task-start-date" />
+          </div>
+          <div class="form-group">
+            <label>Hạn chót (Due Date)</label>
+            <input type="date" formControlName="dueDate" class="form-control" id="form-task-due-date" />
+          </div>
+          <div class="form-group">
+            <label>Ước tính (phút)</label>
+            <input type="number" formControlName="estimateMinutes" min="0" class="form-control" id="form-task-estimate" placeholder="VD: 480" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Tiến độ (%)</label>
+          <div class="progress-slider-row">
+            <input type="range" formControlName="progress" min="0" max="100" step="5" class="range-slider" />
+            <span class="progress-val-badge">{{ taskForm.get('progress')?.value ?? 0 }}%</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Mô tả chi tiết</label>
+          <textarea formControlName="description" rows="3" id="form-task-description"
+            placeholder="Nội dung yêu cầu, mục tiêu, tiêu chí chấp nhận..." class="form-control"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Ghi chú nội bộ</label>
+          <textarea formControlName="notes" rows="2" id="form-task-notes"
+            placeholder="Ghi chú riêng, trao đổi nội bộ..." class="form-control"></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" (click)="closeModal()" class="btn-secondary" id="modal-cancel-task">Hủy</button>
+          <button type="submit" class="btn-primary" [disabled]="formSubmitting()" id="modal-submit-task">
+            <span *ngIf="!formSubmitting()">{{ isEditMode() ? 'Cập nhật' : 'Tạo mới' }}</span>
+            <span *ngIf="formSubmitting()" class="loading-dots">Đang xử lý...</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ═══════════════ MODAL: Status Change ═══════════════ -->
+  <div *ngIf="showStatusModal()" class="modal-backdrop" (click)="closeStatusModal()">
+    <div class="modal-card modal-sm" (click)="$event.stopPropagation()" id="status-change-modal">
+      <div class="modal-header">
+        <h3>🔄 Chuyển Trạng thái</h3>
+        <button (click)="closeStatusModal()" class="close-btn">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="task-preview">
+          <code>{{ targetTask?.code }}</code>
+          <span>{{ targetTask?.title }}</span>
+        </div>
+
+        <div *ngIf="statusModalError()" class="alert alert-danger">⚠️ {{ statusModalError() }}</div>
+
+        <div class="form-group">
+          <label>Trạng thái mới</label>
+          <select [(ngModel)]="newStatus" (change)="statusModalError.set(null)" class="form-control" id="select-new-status">
+            <option *ngFor="let opt of allowedStatuses()" [value]="opt.value">{{ opt.label }}</option>
+          </select>
+        </div>
+
+        <div *ngIf="newStatus === 'BLOCKED'" class="form-group">
+          <label>Lý do tắc nghẽn <span class="req">*</span></label>
+          <textarea [(ngModel)]="blockerReason" rows="3" id="input-blocker-reason"
+            placeholder="Mô tả nguyên nhân bị tắc nghẽn..." class="form-control"></textarea>
+        </div>
+
+        <div *ngIf="newStatus === 'DONE'" class="alert alert-info">
+          ℹ️ Khi chuyển sang DONE, tiến độ sẽ tự động đặt về 100%.
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button (click)="closeStatusModal()" class="btn-secondary" id="status-modal-cancel">Hủy</button>
+        <button (click)="confirmStatusChange()" class="btn-primary" [disabled]="statusSubmitting()" id="status-modal-confirm">
+          <span *ngIf="!statusSubmitting()">Xác nhận</span>
+          <span *ngIf="statusSubmitting()">Đang xử lý...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ MODAL: Delete ═══════════════ -->
+  <div *ngIf="showDeleteModal()" class="modal-backdrop" (click)="closeDeleteModal()">
+    <div class="modal-card modal-sm" (click)="$event.stopPropagation()" id="delete-task-modal">
+      <div class="modal-header">
+        <h3>🗑️ Xóa Công việc</h3>
+        <button (click)="closeDeleteModal()" class="close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="delete-confirm">
+          <div class="delete-icon">⚠️</div>
+          <p>Bạn có chắc muốn xóa công việc:</p>
+          <div class="delete-target">
+            <code>{{ deletingTask?.code }}</code>
+            <strong>{{ deletingTask?.title }}</strong>
+          </div>
+          <p class="delete-note">Hành động này không thể hoàn tác. Lưu ý: không thể xóa task khi còn task con.</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button (click)="closeDeleteModal()" class="btn-secondary" id="delete-modal-cancel">Hủy</button>
+        <button (click)="confirmDelete()" class="btn-danger" [disabled]="deleteSubmitting()" id="delete-modal-confirm">
+          <span *ngIf="!deleteSubmitting()">Xác nhận xóa</span>
+          <span *ngIf="deleteSubmitting()">Đang xóa...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

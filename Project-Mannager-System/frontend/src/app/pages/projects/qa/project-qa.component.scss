@@ -1,0 +1,459 @@
+.qa-tab-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1rem 0;
+
+  .qa-subtabs {
+    display: flex;
+    gap: 1rem;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.05);
+    padding-bottom: 0.5rem;
+
+    .tab-btn {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      font-size: 1rem;
+      font-weight: bold;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: all 0.2s;
+
+      &:hover {
+        color: #f1f5f9;
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      &.active {
+        color: #3b82f6;
+        background: rgba(59, 130, 246, 0.08);
+      }
+    }
+  }
+
+  .tab-header-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+
+    h4 {
+      margin: 0;
+      color: #f8fafc;
+    }
+  }
+
+  .loading-state, .empty-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    color: #94a3b8;
+    text-align: center;
+  }
+
+  .qa-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.5rem;
+
+    th, td {
+      padding: 1rem;
+      text-align: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    th {
+      background: #1e1e24;
+      color: #cbd5e1;
+      font-weight: bold;
+      text-transform: uppercase;
+      font-size: 0.85rem;
+    }
+
+    td {
+      color: #cbd5e1;
+      font-size: 0.9rem;
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+  }
+
+  // Badges
+  .prio-badge {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    font-weight: bold;
+    text-transform: uppercase;
+
+    &.low { background: rgba(71, 85, 105, 0.2); color: #94a3b8; }
+    &.medium { background: rgba(234, 179, 8, 0.2); color: #fef08a; }
+    &.high { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+    &.critical { background: #ef4444; color: #fff; }
+  }
+
+  .status-badge {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    font-weight: bold;
+    text-transform: uppercase;
+
+    &.draft { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; }
+    &.active { background: rgba(16, 185, 129, 0.15); color: #a7f3d0; }
+    &.retired { background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
+  }
+
+  .run-status-badge {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    font-weight: bold;
+    text-transform: uppercase;
+
+    &.pending { background: rgba(234, 179, 8, 0.15); color: #fef08a; }
+    &.in_progress { background: rgba(59, 130, 246, 0.15); color: #bfdbfe; }
+    &.completed { background: rgba(16, 185, 129, 0.15); color: #a7f3d0; }
+  }
+
+  .btn-icon {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 0.3rem 0.5rem;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    &.delete {
+      color: #f87171;
+      &:hover {
+        background: rgba(239, 68, 68, 0.1);
+      }
+    }
+  }
+
+  .btn-exec {
+    background: rgba(59, 130, 246, 0.1);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      background: rgba(59, 130, 246, 0.2);
+      border-color: #3b82f6;
+    }
+  }
+
+  // Modals Styling
+  .case-modal {
+    max-width: 750px;
+  }
+
+  .steps-section {
+    margin-top: 1.5rem;
+    background: rgba(0, 0, 0, 0.1);
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+
+    .steps-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+
+      h5 {
+        margin: 0;
+        color: #cbd5e1;
+      }
+    }
+
+    .steps-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .step-form-item {
+      background: #272730;
+      padding: 1rem;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      position: relative;
+    }
+
+    .step-num-del {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.8rem;
+    }
+
+    .step-num-badge {
+      font-size: 0.75rem;
+      background: #3b82f6;
+      color: #fff;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+
+    .btn-del-step {
+      background: none;
+      border: none;
+      color: #ef4444;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: bold;
+      &:hover {
+        color: #f87171;
+      }
+    }
+
+    .step-fields {
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+    }
+  }
+
+  // TestCase Checklist in TestRun modal
+  .tc-checklist-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    margin-top: 1rem;
+
+    .tc-checklist {
+      max-height: 250px;
+      overflow-y: auto;
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 0.8rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .tc-check-item {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      cursor: pointer;
+
+      input {
+        cursor: pointer;
+      }
+
+      label {
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: #cbd5e1;
+        font-size: 0.9rem;
+      }
+
+      .prio-tag {
+        font-size: 0.65rem;
+        padding: 0.1rem 0.3rem;
+        border-radius: 4px;
+        font-weight: bold;
+        text-transform: uppercase;
+
+        &.low { background: rgba(71, 85, 105, 0.2); color: #94a3b8; }
+        &.medium { background: rgba(234, 179, 8, 0.2); color: #fef08a; }
+        &.high { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+        &.critical { background: #ef4444; color: #fff; }
+      }
+    }
+
+    .no-tc-warning {
+      color: #94a3b8;
+      text-align: center;
+      padding: 1rem;
+      font-size: 0.85rem;
+    }
+  }
+
+  // Execution Modal Layout
+  .exec-modal-card {
+    max-width: 950px;
+    height: 85vh;
+  }
+
+  .exec-layout {
+    display: grid;
+    grid-template-columns: 350px 1fr;
+    gap: 1.5rem;
+    height: calc(100% - 110px);
+    overflow: hidden;
+  }
+
+  .exec-cases-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    padding-right: 1rem;
+    overflow-y: auto;
+
+    h5 {
+      margin: 0;
+      color: #94a3b8;
+    }
+
+    .results-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+    }
+
+    .result-item-card {
+      background: #272730;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 0.8rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      transition: all 0.2s;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      &.active {
+        border-color: #3b82f6;
+        background: rgba(59, 130, 246, 0.05);
+      }
+
+      .tc-title {
+        font-size: 0.85rem;
+        color: #f1f5f9;
+        text-align: left;
+      }
+
+      .executor-name {
+        font-size: 0.75rem;
+        color: #94a3b8;
+        margin-top: 0.2rem;
+      }
+    }
+  }
+
+  .exec-form-panel {
+    overflow-y: auto;
+    padding-left: 0.5rem;
+
+    .select-prompt {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #94a3b8;
+      font-size: 0.95rem;
+    }
+
+    .exec-panel-content {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+
+      h4 {
+        margin: 0;
+        color: #f8fafc;
+        text-align: left;
+      }
+    }
+
+    .result-status-log {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      color: #cbd5e1;
+    }
+
+    .status-options {
+      display: flex;
+      gap: 1.5rem;
+      margin-top: 0.5rem;
+    }
+
+    .status-opt {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 0.9rem;
+
+      input {
+        cursor: pointer;
+      }
+
+      &.passed { color: #10b981; }
+      &.failed { color: #ef4444; }
+      &.blocked { color: #eab308; }
+    }
+
+    .auto-bug-card {
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px dashed rgba(239, 68, 68, 0.2);
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: left;
+
+      p {
+        margin: 0.3rem 0;
+        font-size: 0.85rem;
+        color: #fca5a5;
+      }
+
+      .bug-code-badge {
+        display: inline-block;
+        background: #ef4444;
+        color: #fff;
+        font-family: monospace;
+        font-weight: bold;
+        font-size: 0.85rem;
+        padding: 0.2rem 0.6rem;
+        border-radius: 4px;
+        margin-top: 0.5rem;
+      }
+    }
+  }
+
+  .status-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+
+    &.untested { background: #64748b; }
+    &.passed { background: #10b981; }
+    &.failed { background: #ef4444; }
+    &.blocked { background: #eab308; }
+  }
+}

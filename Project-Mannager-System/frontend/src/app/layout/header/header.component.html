@@ -1,0 +1,68 @@
+<header class="top-header">
+  <div class="header-left">
+    <button (click)="toggleSidebar.emit()" class="btn-icon toggle-btn" title="Thu gọn/Mở rộng Sidebar">
+      ☰
+    </button>
+    <div class="search-bar">
+      <span class="search-icon">🔍</span>
+      <input type="text" placeholder="Tìm kiếm nhanh công việc, dự án..." />
+    </div>
+  </div>
+
+  <div class="header-right">
+    <!-- Notification Bell -->
+    <div class="notif-wrapper">
+      <button (click)="toggleNotifications()" class="btn-icon notif-btn" title="Thông báo">
+        🔔
+        <span *ngIf="unreadCount > 0" class="badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
+      </button>
+
+      <!-- Notification Dropdown Panel -->
+      <div *ngIf="showNotificationPanel()" class="notif-panel">
+        <div class="panel-header">
+          <h3>Thông báo</h3>
+          <button *ngIf="unreadCount > 0" (click)="markAllNotificationsRead()" class="btn-text">
+            Đánh dấu đọc tất cả
+          </button>
+        </div>
+
+        <div class="notif-list">
+          <div *ngIf="notifications().length === 0" class="empty-notif">
+            <span>Không có thông báo mới</span>
+          </div>
+
+          <div
+            *ngFor="let item of notifications()"
+            class="notif-item"
+            [class.unread]="!item.isRead"
+            (click)="onNotificationClick(item)"
+          >
+            <div class="notif-title">{{ item.title }}</div>
+            <div class="notif-content">{{ item.content }}</div>
+            <div class="notif-time">{{ item.createdAt | date:'HH:mm dd/MM' }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- User Profile Dropdown -->
+    <div *ngIf="user" class="user-dropdown-wrapper">
+      <button (click)="toggleUserDropdown()" class="user-btn">
+        <div class="avatar">{{ user.fullName ? user.fullName[0].toUpperCase() : 'U' }}</div>
+        <span class="username">{{ user.fullName || user.username }}</span>
+        <span class="arrow">▼</span>
+      </button>
+
+      <div *ngIf="showUserMenu()" class="user-menu">
+        <div class="menu-header">
+          <div class="menu-user-name">{{ user.fullName }}</div>
+          <div class="menu-user-email">{{ user.email }}</div>
+        </div>
+        <div class="menu-divider"></div>
+        <button (click)="logout()" class="menu-item logout-btn">
+          🚪 Đăng xuất
+        </button>
+      </div>
+    </div>
+  </div>
+</header>

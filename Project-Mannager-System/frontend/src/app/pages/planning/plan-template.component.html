@@ -1,0 +1,142 @@
+<div class="template-page">
+  <app-page-header title="Thư viện Template" subtitle="Tạo plan từ template chuẩn (WBS + milestone sẵn có)">
+  </app-page-header>
+
+  <div *ngIf="loading()" class="loading-state">
+    <div class="spinner"></div>
+    <p>Đang tải template...</p>
+  </div>
+
+  <div *ngIf="error() && !loading()" class="alert alert-danger">⚠️ {{ error() }}</div>
+
+  <app-empty-state
+    *ngIf="!loading() && !error() && templates().length === 0"
+    title="Chưa có template"
+    description="8 template mặc định (FULL_SDL, AGILE_SPRINT...) được seed sẵn — đảm bảo template PUBLISHED."
+  >
+  </app-empty-state>
+
+  <div *ngIf="!loading() && !error() && templates().length > 0" class="template-grid">
+    <div *ngFor="let t of templates()" class="template-card">
+      <div class="t-head">
+        <span class="t-code">{{ t.templateCode }}</span>
+        <span class="t-status" [class.st-draft]="t.status === 'DRAFT'">{{ statusLabels[t.status] }}</span>
+      </div>
+      <h4 class="t-name">{{ t.templateName }}</h4>
+      <p class="t-desc">{{ t.description || '—' }}</p>
+      <div class="t-meta">
+        <span class="t-chip">{{ typeLabels[t.templateType] }}</span>
+        <span class="t-chip" *ngIf="t.category">{{ t.category }}</span>
+        <span class="t-chip" *ngIf="t.isBuiltIn">Built-in</span>
+      </div>
+      <div class="t-foot">
+        <span class="t-stats">v{{ t.versionNo }} · {{ t.taskCount }} task</span>
+        <div class="t-actions">
+          <button (click)="openDetail(t)" class="btn-secondary btn-xs">👁 Xem</button>
+          <button *hasPermission="'plan:create'" (click)="openCreate(t)" class="btn-primary btn-xs">➕ Tạo plan</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Detail modal ─────────────────────────────────────────── -->
+  <div *ngIf="showDetail()" class="modal-backdrop">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h3>Template {{ detail()?.templateCode || '' }} — {{ detail()?.templateName }}</h3>
+        <button (click)="closeDetail()" class="close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div *ngIf="detailLoading()" class="loading-state">
+          <div class="spinner"></div>
+          <p>Đang tải chi tiết...</p>
+        </div>
+        <div *ngIf="detailError() && !detailLoading()" class="alert alert-danger">⚠️ {{ detailError() }}</div>
+        <div *ngIf="detail() && !detailLoading()" class="tpl-meta">
+          <span class="t-chip">{{ typeLabels[detail()!.templateType] }}</span>
+          <span class="t-chip" *ngIf="detail()!.category">{{ detail()!.category }}</span>
+          <span>v{{ detail()!.versionNo }}</span>
+          <span>{{ detail()!.tasks.length }} task</span>
+        </div>
+        <div *ngIf="detail() && !detailLoading() && taskRows().length > 0" class="tpl-tree">
+          <div *ngFor="let row of taskRows()" class="tpl-row">
+            <span class="tpl-wbs">{{ row.wbsCode }}</span>
+            <span class="tpl-name">{{ row.taskName }}</span>
+            <span class="tpl-type">{{ taskTypeLabels[row.taskType] }}</span>
+            <span class="tpl-min" *ngIf="row.durationMinutes != null">{{ row.durationMinutes }} phút</span>
+            <span class="tpl-min" *ngIf="row.plannedEffortMinutes != null">effort {{ row.plannedEffortMinutes }}'</span>
+          </div>
+        </div>
+        <app-empty-state
+          *ngIf="detail() && !detailLoading() && taskRows().length === 0"
+          title="Template không có task"
+          description="Template PARTIAL có thể không kèm WBS mặc định."
+        >
+        </app-empty-state>
+      </div>
+      <div class="modal-footer">
+        <button *hasPermission="'plan:create'" [disabled]="!detail()" (click)="openCreate(detail()!)" class="btn-primary">
+          ➕ Tạo plan từ template
+        </button>
+        <button (click)="closeDetail()" class="btn-secondary">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Create-from-template modal ──────────────────────────── -->
+  <div *ngIf="showCreateModal()" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Tạo plan từ template {{ selectedTemplate?.templateCode }}</h3>
+        <button (click)="closeCreate()" class="close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div *ngIf="createError()" class="alert alert-danger">⚠️ {{ createError() }}</div>
+        <form [formGroup]="createForm">
+          <div class="form-group">
+            <label>Dự án <span class="req">*</span></label>
+            <select formControlName="projectId" class="form-control" (change)="onProjectChange()">
+              <option value="">Chọn dự án...</option>
+              <option *ngFor="let p of projects()" [value]="p.id">{{ p.code }} — {{ p.name }}</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <div class="form-group col">
+              <label>Mã kế hoạch <span class="req">*</span></label>
+              <input type="text" formControlName="planCode" class="form-control" maxlength="50" placeholder="VD: PLAN-SDL-01" />
+            </div>
+            <div class="form-group col">
+              <label>Loại plan</label>
+              <select formControlName="planType" class="form-control" (change)="onPlanTypeChange()">
+                <option value="MASTER">Master</option>
+                <option value="DETAIL">Detail</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Tên kế hoạch <span class="req">*</span></label>
+            <input type="text" formControlName="planName" class="form-control" maxlength="200" />
+          </div>
+          <div class="form-group" *ngIf="createForm.value.planType === 'DETAIL'">
+            <label>Master plan cha <span class="req">*</span></label>
+            <select formControlName="parentPlanId" class="form-control">
+              <option value="">Chọn master plan...</option>
+              <option *ngFor="let m of masterPlans()" [value]="m.id">{{ m.planCode }} — {{ m.planName }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Ngày bắt đầu <span class="req">*</span></label>
+            <input type="date" formControlName="startDate" class="form-control" />
+          </div>
+          <div class="modal-footer">
+            <button type="button" (click)="closeCreate()" class="btn-secondary">Hủy</button>
+            <button type="button" (click)="createPlan()" class="btn-primary" [disabled]="createBusy()">
+              <span *ngIf="!createBusy()">Tạo kế hoạch</span>
+              <span *ngIf="createBusy()">Đang tạo...</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

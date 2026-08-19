@@ -1,0 +1,168 @@
+<div class="wiki-container">
+  <!-- Loading State -->
+  <div *ngIf="loading()" class="loading-state">
+    <div class="spinner"></div>
+    <p>Đang tải tri thức dự án...</p>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="error() && !loading()" class="error-state">
+    <p>⚠️ {{ error() }}</p>
+    <button (click)="loadWiki()" class="btn-secondary">Thử lại</button>
+  </div>
+
+  <!-- Wiki Content Split View -->
+  <div *ngIf="!loading() && !error()" class="wiki-split-view">
+    
+    <!-- Left Sidebar: Document Tree -->
+    <div class="wiki-sidebar">
+      <div class="sidebar-header">
+        <h4>Tri thức dự án</h4>
+        <button *hasPermission="'project:update'" (click)="openCreate()" class="btn-add-root" title="Thêm trang gốc">
+          ➕ Trang gốc
+        </button>
+      </div>
+
+      <!-- Empty Sidebar State (Wiki Not Initialized) -->
+      <div *ngIf="pages().length === 0" class="sidebar-empty">
+        <p>Chưa có trang tài liệu nào.</p>
+      </div>
+
+      <!-- Recursive Tree Structure -->
+      <div *ngIf="pages().length > 0" class="wiki-tree">
+        <ng-container *ngTemplateOutlet="nodeTemplate; context: { $implicit: treeNodes() }"></ng-container>
+      </div>
+    </div>
+
+    <!-- Right Panel: View / Edit Area -->
+    <div class="wiki-content-panel">
+      <!-- 1. Wiki Empty (Not Initialized State) -->
+      <div *ngIf="pages().length === 0 && !isCreateMode()" class="wiki-not-init">
+        <app-empty-state
+          title="Tri thức Wiki chưa khởi tạo"
+          description="Khởi tạo Wiki dự án theo tiêu chuẩn phát triển phần mềm toàn trình (gồm Getting Started, Git Conventions, Architecture & Design, QA Guidelines, Deployment Setup) để bắt đầu lưu trữ tri thức dự án."
+        >
+          <button *hasPermission="'project:update'" (click)="initializeWiki()" class="btn-primary">
+            🚀 Khởi tạo Wiki từ mẫu chuẩn
+          </button>
+        </app-empty-state>
+      </div>
+
+      <!-- 2. Form Mode (Create / Edit Page) -->
+      <div *ngIf="isCreateMode() || isEditMode()" class="wiki-form-card">
+        <div class="form-header">
+          <h3>{{ isEditMode() ? 'Cập nhật trang: ' + selectedPage()?.title : 'Tạo trang tài liệu mới' }}</h3>
+        </div>
+
+        <div *ngIf="formError()" class="alert-danger">
+          ⚠️ {{ formError() }}
+        </div>
+
+        <form [formGroup]="wikiForm" (ngSubmit)="saveWiki()" class="form-body">
+          <div class="form-group">
+            <label>Tiêu đề trang <span class="req">*</span></label>
+            <input type="text" formControlName="title" placeholder="VD: 1. Hướng dẫn thiết lập" class="form-control" />
+            <small *ngIf="wikiForm.get('title')?.touched && wikiForm.get('title')?.invalid" class="invalid">Vui lòng nhập tiêu đề ≤ 200 ký tự</small>
+          </div>
+
+          <div class="form-group content-group">
+            <label>Nội dung (hỗ trợ Markdown) <span class="req">*</span></label>
+            <textarea formControlName="content" rows="15" placeholder="Sử dụng Markdown: # Header, **Bold**, - Lists, `code`..." class="form-control markdown-input"></textarea>
+            <small *ngIf="wikiForm.get('content')?.touched && wikiForm.get('content')?.invalid" class="invalid">Vui lòng điền nội dung</small>
+          </div>
+
+          <!-- Markdown Live Preview -->
+          <div class="form-group preview-group">
+            <label>Xem trước giao diện (Live Preview)</label>
+            <div class="preview-box markdown-body" [innerHTML]="renderMarkdown(wikiForm.get('content')?.value)"></div>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" (click)="cancelForm()" class="btn-secondary">Hủy</button>
+            <button type="submit" class="btn-primary" [disabled]="formSubmitting()">
+              {{ formSubmitting() ? 'Đang lưu...' : 'Lưu trang tài liệu' }}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- 3. View Mode (Selected Page Detail) -->
+      <div *ngIf="selectedPage() && !isCreateMode() && !isEditMode()" class="wiki-detail">
+        <div class="detail-header">
+          <div class="header-left">
+            <h2>{{ selectedPage()?.title }}</h2>
+            <div class="page-meta">
+              <span class="meta-version">Phiên bản: <strong>v{{ selectedPage()?.version }}</strong></span>
+              <span class="meta-date">Cập nhật: {{ selectedPage()?.updatedAt | date:'dd/MM/yyyy HH:mm' }}</span>
+            </div>
+          </div>
+          <div class="header-right">
+            <ng-container *hasPermission="'project:update'">
+              <button (click)="openEdit()" class="btn-action btn-edit" title="Sửa trang này">✏️ Sửa trang</button>
+              <button (click)="deleteWiki()" class="btn-action btn-delete" title="Xóa trang này">🗑️ Xóa trang</button>
+            </ng-container>
+          </div>
+        </div>
+
+        <!-- Rendered Page Content -->
+        <div class="wiki-content-body markdown-body" [innerHTML]="renderMarkdown(selectedPage()?.content)">
+        </div>
+
+        <!-- Revision History Accordion -->
+        <div class="history-section">
+          <details class="history-details">
+            <summary class="history-summary">
+              📜 Lịch sử chỉnh sửa ({{ history().length }} phiên bản)
+            </summary>
+            <div class="history-content">
+              <div *ngIf="historyLoading()" class="history-loader">Đang tải lịch sử...</div>
+              <table *ngIf="!historyLoading() && history().length > 0" class="history-table">
+                <thead>
+                  <tr>
+                    <th>Thời gian</th>
+                    <th>Tiêu đề</th>
+                    <th>Người cập nhật</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let h of history()">
+                    <td class="col-date">{{ h.changedAt | date:'dd/MM/yyyy HH:mm' }}</td>
+                    <td class="col-title">{{ h.title }}</td>
+                    <td class="col-author">{{ h.changedByName || 'Thành viên' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <!-- 4. Default State (Wiki has pages but none is selected) -->
+      <div *ngIf="pages().length > 0 && !selectedPage() && !isCreateMode()" class="wiki-default">
+        <p>Chọn một trang tài liệu ở thanh danh mục bên trái để xem nội dung.</p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Recursive Node Template -->
+<ng-template #nodeTemplate let-nodes>
+  <ul class="tree-list">
+    <li *ngFor="let node of nodes" class="tree-node" [class.expanded]="node.expanded">
+      <div class="tree-row" [class.active]="selectedPage()?.id === node.page.id" (click)="selectPage(node.page)">
+        <span class="toggle-btn" (click)="toggleExpand(node, $event)">
+          <span *ngIf="node.children.length > 0">{{ node.expanded ? '▼' : '▶' }}</span>
+          <span *ngIf="node.children.length === 0" class="dot">•</span>
+        </span>
+        <span class="page-title-text" [title]="node.page.title">{{ node.page.title }}</span>
+        <button *hasPermission="'project:update'" (click)="openCreate(node.page.id); $event.stopPropagation();" class="btn-node-add" title="Thêm trang con">
+          ＋
+        </button>
+      </div>
+      <div *ngIf="node.expanded && node.children.length > 0" class="node-children">
+        <ng-container *ngTemplateOutlet="nodeTemplate; context: { $implicit: node.children }"></ng-container>
+      </div>
+    </li>
+  </ul>
+</ng-template>

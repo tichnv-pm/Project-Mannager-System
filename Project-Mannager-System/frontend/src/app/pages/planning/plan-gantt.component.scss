@@ -1,0 +1,384 @@
+.gantt-container {
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  margin-top: 16px;
+}
+
+// ─── Toolbar ──────────────────────────────────────────────────
+.gantt-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+
+  .toolbar-left, .toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .zoom-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+
+    .label {
+      font-size: 13px;
+      font-weight: 500;
+      color: #64748b;
+      margin-right: 4px;
+    }
+
+    .btn-zoom {
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #475569;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: #f1f5f9;
+      }
+
+      &.active {
+        background: #6366f1;
+        color: #ffffff;
+        border-color: #6366f1;
+      }
+    }
+  }
+
+  .toggle-group {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+
+    .toggle-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      color: #334155;
+
+      input[type="checkbox"] {
+        cursor: pointer;
+      }
+
+      .toggle-label.critical {
+        color: #ef4444;
+      }
+
+      .toggle-label.baseline {
+        color: #64748b;
+      }
+    }
+  }
+
+  .search-box input {
+    padding: 6px 12px;
+    font-size: 13px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    width: 180px;
+    outline: none;
+
+    &:focus {
+      border-color: #6366f1;
+    }
+  }
+
+  .btn-refresh {
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #475569;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    cursor: pointer;
+
+    &:hover {
+      background: #f1f5f9;
+    }
+  }
+}
+
+// ─── Loading & Error States ───────────────────────────────────
+.gantt-loading, .gantt-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+
+  .spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid #e2e8f0;
+    border-top-color: #6366f1;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  p {
+    margin-top: 12px;
+    font-size: 14px;
+    color: #64748b;
+  }
+
+  .btn-retry {
+    margin-top: 12px;
+    padding: 6px 16px;
+    background: #6366f1;
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+// ─── Split View Layout ────────────────────────────────────────
+.gantt-split-view {
+  display: flex;
+  width: 100%;
+  overflow: hidden;
+}
+
+// ─── Left Grid Pane ───────────────────────────────────────────
+.gantt-grid-pane {
+  width: 380px;
+  min-width: 380px;
+  flex-shrink: 0;
+  border-right: 2px solid #cbd5e1;
+  background: #ffffff;
+
+  .grid-header {
+    display: flex;
+    align-items: center;
+    height: 50px;
+    background: #f1f5f9;
+    border-bottom: 1px solid #cbd5e1;
+    font-size: 12px;
+    font-weight: 700;
+    color: #475569;
+
+    .col {
+      padding: 0 8px;
+    }
+  }
+
+  .grid-body {
+    display: flex;
+    flex-direction: column;
+
+    .grid-row {
+      display: flex;
+      align-items: center;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 13px;
+      color: #1e293b;
+      transition: background 0.15s ease;
+
+      &:hover {
+        background: #f8fafc;
+      }
+
+      &.row-critical {
+        background: #fef2f2;
+      }
+    }
+
+    .empty-grid {
+      padding: 24px;
+      text-align: center;
+      font-size: 13px;
+      color: #94a3b8;
+    }
+  }
+
+  .col-wbs {
+    width: 60px;
+    flex-shrink: 0;
+    font-size: 12px;
+    color: #64748b;
+  }
+
+  .col-name {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow: hidden;
+
+    .critical-dot {
+      font-size: 10px;
+    }
+
+    .task-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  .col-type {
+    width: 80px;
+    flex-shrink: 0;
+
+    .type-badge {
+      display: inline-block;
+      padding: 2px 6px;
+      font-size: 10px;
+      font-weight: 700;
+      border-radius: 4px;
+      text-transform: uppercase;
+
+      &.phase { background: #e0e7ff; color: #3730a3; }
+      &.work_package { background: #fef3c7; color: #92400e; }
+      &.task { background: #f1f5f9; color: #475569; }
+      &.milestone { background: #fef08a; color: #854d0e; }
+    }
+  }
+
+  .col-progress {
+    width: 80px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    .progress-bar-sm {
+      flex: 1;
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 3px;
+      overflow: hidden;
+
+      .fill {
+        height: 100%;
+        background: #10b981;
+      }
+    }
+
+    .pct-text {
+      font-size: 11px;
+      color: #64748b;
+      width: 28px;
+    }
+  }
+}
+
+// ─── Right Timeline SVG Pane ──────────────────────────────────
+.gantt-timeline-pane {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: #ffffff;
+}
+
+.timeline-scroll-wrapper {
+  display: inline-block;
+  min-width: 100%;
+}
+
+.gantt-svg {
+  display: block;
+
+  .weekend-rect {
+    fill: #f8fafc;
+  }
+
+  .header-cell-rect {
+    fill: #f1f5f9;
+    stroke: #cbd5e1;
+    stroke-width: 1;
+  }
+
+  .header-text {
+    font-size: 11px;
+    font-weight: 600;
+    fill: #475569;
+  }
+
+  .row-line {
+    stroke: #f1f5f9;
+    stroke-width: 1;
+  }
+
+  .baseline-overlay-bar {
+    fill: #94a3b8;
+    opacity: 0.5;
+  }
+
+  .dependency-path {
+    fill: none;
+    stroke: #6366f1;
+    stroke-width: 1.5;
+    stroke-dasharray: 0;
+  }
+
+  .task-bars-group {
+    .task-bar-item {
+      cursor: pointer;
+
+      .task-rect-bg {
+        fill: #818cf8;
+        opacity: 0.3;
+      }
+
+      .task-rect-progress {
+        fill: #4f46e5;
+      }
+
+      .bar-label-text {
+        font-size: 11px;
+        font-weight: 500;
+        fill: #ffffff;
+        pointer-events: none;
+      }
+
+      .milestone-diamond {
+        fill: #eab308;
+        stroke: #ca8a04;
+        stroke-width: 1.5;
+      }
+
+      .summary-bracket {
+        fill: #312e81;
+      }
+
+      &.critical-bar {
+        .task-rect-bg {
+          fill: #f87171;
+          opacity: 0.4;
+        }
+
+        .task-rect-progress {
+          fill: #dc2626;
+        }
+
+        .milestone-diamond {
+          fill: #ef4444;
+          stroke: #b91c1c;
+        }
+      }
+    }
+  }
+}

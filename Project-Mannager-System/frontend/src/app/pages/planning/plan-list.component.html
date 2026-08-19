@@ -1,0 +1,305 @@
+<div class="plans-page">
+  <app-page-header title="Kế hoạch Dự án" subtitle="Lập kế hoạch Master/Detail, vòng đời DRAFT → SUBMITTED → APPROVED → ACTIVE">
+    <button (click)="openTemplateModal()" class="btn-secondary mr-2">
+      📚 Thư viện Mẫu Kế hoạch (8 Mẫu)
+    </button>
+    <button *hasPermission="'plan:create'" (click)="openCreateModal()" class="btn-primary">
+      ➕ Tạo kế hoạch
+    </button>
+  </app-page-header>
+
+  <!-- Filter Bar -->
+  <div class="filter-bar">
+    <div class="search-box">
+      <span class="icon">🔍</span>
+      <input
+        type="text"
+        [(ngModel)]="keyword"
+        (keyup.enter)="onFilter()"
+        placeholder="Tìm kiếm mã, tên kế hoạch..."
+        class="form-control"
+      />
+    </div>
+
+    <div class="filter-select">
+      <select [(ngModel)]="selectedProjectId" (change)="onFilter()" class="form-control">
+        <option value="">-- Tất cả dự án --</option>
+        <option *ngFor="let p of projectsList()" [value]="p.id">{{ p.code }} — {{ p.name }}</option>
+      </select>
+    </div>
+
+    <div class="filter-select">
+      <select [(ngModel)]="selectedPlanType" (change)="onFilter()" class="form-control">
+        <option value="">-- Tất cả loại --</option>
+        <option value="MASTER">Master Plan</option>
+        <option value="DETAIL">Detail Plan</option>
+        <option value="TEMPLATE_INSTANCE">Từ Template</option>
+      </select>
+    </div>
+
+    <div class="filter-select">
+      <select [(ngModel)]="selectedStatus" (change)="onFilter()" class="form-control">
+        <option value="">-- Tất cả trạng thái --</option>
+        <option *ngFor="let s of statusOptions" [value]="s.value">{{ s.label }}</option>
+      </select>
+    </div>
+
+    <button (click)="onFilter()" class="btn-secondary">Tìm kiếm</button>
+    <button *ngIf="keyword || selectedProjectId || selectedPlanType || selectedStatus" (click)="resetFilter()" class="btn-text">Xóa bộ lọc</button>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading()" class="loading-state">
+    <div class="spinner"></div>
+    <p>Đang tải danh sách kế hoạch...</p>
+  </div>
+
+  <!-- Empty State -->
+  <app-empty-state
+    *ngIf="!loading() && plans().length === 0"
+    title="Không có kế hoạch nào"
+    description="Tạo một kế hoạch Master cho dự án của bạn để bắt đầu lập WBS và lịch triển khai."
+  >
+    <button *hasPermission="'plan:create'" (click)="openCreateModal()" class="btn-primary">
+      Tạo kế hoạch đầu tiên
+    </button>
+  </app-empty-state>
+
+  <!-- Plans Cards Grid -->
+  <div *ngIf="!loading() && plans().length > 0" class="plans-grid">
+    <div *ngFor="let p of plans()" class="plan-card">
+      <div class="card-top">
+        <div class="badges">
+          <span class="code-badge">{{ p.planCode }}</span>
+          <span class="type-badge">{{ typeLabel(p.planType) }}</span>
+        </div>
+        <app-status-chip [status]="p.status"></app-status-chip>
+      </div>
+
+      <h3 class="plan-title">
+        <a [routerLink]="['/plans', p.id]">{{ p.planName }}</a>
+      </h3>
+
+      <p class="plan-project">📁 {{ projectLabel(p.projectId) }}</p>
+      <p *ngIf="p.description" class="plan-desc">{{ p.description }}</p>
+
+      <div class="progress-section">
+        <div class="progress-info">
+          <span>Tiến độ</span>
+          <span class="progress-val">{{ p.progress }}%</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" [style.width.%]="p.progress"></div>
+        </div>
+      </div>
+
+      <div class="card-meta">
+        <span class="meta-item">📅 {{ p.plannedStart || '—' }} → {{ p.plannedFinish || '—' }}</span>
+        <span class="meta-item" *ngIf="p.activeVersionNo != null">📦 v{{ p.activeVersionNo }}</span>
+      </div>
+
+      <div class="lifecycle-actions">
+        <ng-container *hasPermission="'plan:update'">
+          <button
+            *ngIf="p.status === 'DRAFT'"
+            (click)="submitPlan(p)"
+            [disabled]="lifecycleBusy[p.id]"
+            class="btn-lifecycle btn-submit"
+          >🚀 Gửi duyệt</button>
+        </ng-container>
+        <ng-container *hasPermission="'plan:approve'">
+          <button
+            *ngIf="p.status === 'SUBMITTED'"
+            (click)="approvePlan(p)"
+            [disabled]="lifecycleBusy[p.id]"
+            class="btn-lifecycle btn-approve"
+          >✔ Duyệt</button>
+          <button
+            *ngIf="p.status === 'APPROVED'"
+            (click)="activatePlan(p)"
+            [disabled]="lifecycleBusy[p.id]"
+            class="btn-lifecycle btn-activate"
+          >▶ Kích hoạt</button>
+        </ng-container>
+      </div>
+
+      <div class="card-actions">
+        <a [routerLink]="['/plans', p.id]" class="btn-action btn-view">👁️ Chi tiết</a>
+        <button *hasPermission="'plan:update'" (click)="openEditModal(p)" class="btn-action btn-edit">✏️ Sửa</button>
+        <button *hasPermission="'plan:delete'" (click)="openDeleteModal(p)" class="btn-action btn-delete">🗑️ Xóa</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pagination -->
+  <div *ngIf="!loading() && totalElements() > size" class="pagination">
+    <button class="btn-page" [disabled]="page === 0" (click)="goToPage(page - 1)">← Trước</button>
+    <span class="page-info">Trang {{ page + 1 }} / {{ totalPages() }}</span>
+    <button class="btn-page" [disabled]="!hasNextPage()" (click)="goToPage(page + 1)">Sau →</button>
+  </div>
+
+  <!-- Create / Edit Plan Modal -->
+  <div *ngIf="showModal()" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>{{ isEditMode() ? 'Cập nhật Kế hoạch' : 'Tạo Kế hoạch Mới' }}</h3>
+        <button (click)="closeModal()" class="close-btn">✕</button>
+      </div>
+
+      <div *ngIf="formError()" class="alert alert-danger">
+        ⚠️ {{ formError() }}
+      </div>
+
+      <form [formGroup]="planForm" (ngSubmit)="savePlan()" class="modal-body">
+        <div *ngIf="!isEditMode()" class="form-group">
+          <label>Dự án <span class="req">*</span></label>
+          <select formControlName="projectId" (change)="onProjectChange()" class="form-control">
+            <option value="">-- Chọn dự án --</option>
+            <option *ngFor="let p of projectsList()" [value]="p.id">{{ p.code }} — {{ p.name }}</option>
+          </select>
+          <small *ngIf="planForm.get('projectId')?.touched && planForm.get('projectId')?.invalid" class="invalid">Bắt buộc chọn dự án</small>
+        </div>
+
+        <div *ngIf="!isEditMode()" class="form-row">
+          <div class="form-group col">
+            <label>Loại kế hoạch <span class="req">*</span></label>
+            <select formControlName="planType" (change)="onPlanTypeChange()" class="form-control">
+              <option value="MASTER">Master Plan</option>
+              <option value="DETAIL">Detail Plan</option>
+              <option value="TEMPLATE_INSTANCE">Từ Template</option>
+            </select>
+          </div>
+
+          <div class="form-group col">
+            <label>Mã kế hoạch <span class="req">*</span></label>
+            <input type="text" formControlName="planCode" placeholder="VD: MOB-2026-MASTER" class="form-control" [readonly]="isEditMode()" />
+            <small *ngIf="planForm.get('planCode')?.touched && planForm.get('planCode')?.invalid" class="invalid">Mã kế hoạch 3-50 ký tự, duy nhất trong dự án</small>
+          </div>
+        </div>
+
+        <div *ngIf="planForm.get('planType')?.value === 'DETAIL' && !isEditMode()" class="form-group">
+          <label>Master Plan cha <span class="req">*</span></label>
+          <select formControlName="parentPlanId" class="form-control">
+            <option value="">-- Chọn Master Plan --</option>
+            <option *ngFor="let m of masterPlans()" [value]="m.id">{{ m.planCode }} — {{ m.planName }}</option>
+          </select>
+          <small *ngIf="planForm.get('parentPlanId')?.touched && planForm.get('parentPlanId')?.invalid" class="invalid">Detail Plan phải thuộc một Master Plan</small>
+        </div>
+
+        <div class="form-group">
+          <label>Tên kế hoạch <span class="req">*</span></label>
+          <input type="text" formControlName="planName" placeholder="VD: Kế hoạch toàn trình App Mobile" class="form-control" />
+          <small *ngIf="planForm.get('planName')?.touched && planForm.get('planName')?.invalid" class="invalid">Tên kế hoạch không quá 200 ký tự</small>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col">
+            <label>Ngày bắt đầu kế hoạch</label>
+            <input type="date" formControlName="plannedStart" class="form-control" />
+          </div>
+
+          <div class="form-group col">
+            <label>Ngày kết thúc kế hoạch</label>
+            <input type="date" formControlName="plannedFinish" class="form-control" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Mô tả</label>
+          <textarea formControlName="description" rows="3" placeholder="Mô tả phạm vi và mục tiêu kế hoạch..." class="form-control"></textarea>
+        </div>
+
+        <p *ngIf="!isEditMode()" class="hint-text">💡 Sau khi tạo, kế hoạch ở trạng thái Nháp (DRAFT) và tự khởi tạo phiên bản 1. Kế hoạch phải có ≥ 1 planning task mới có thể gửi duyệt.</p>
+
+        <div class="modal-footer">
+          <button type="button" (click)="closeModal()" class="btn-secondary">Hủy</button>
+          <button type="submit" class="btn-primary" [disabled]="formSubmitting()">
+            <span *ngIf="!formSubmitting()">Lưu thông tin</span>
+            <span *ngIf="formSubmitting()">Đang xử lý...</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Template Library Modal (8 Built-in Templates) -->
+  <div *ngIf="showTemplateModal()" class="modal-backdrop">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h3>📚 Thư viện Mẫu Kế hoạch (8 Mẫu Chuẩn)</h3>
+        <button (click)="closeTemplateModal()" class="close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="subtitle-text">Khởi tạo nhanh kế hoạch Master/Detail từ các khung mẫu chuẩn hóa tích hợp sẵn (Built-in Templates):</p>
+        
+        <div *ngIf="templateLoading()" class="loading-state">
+          <div class="spinner"></div>
+          <p>Đang tải thư viện mẫu kế hoạch...</p>
+        </div>
+
+        <div *ngIf="!templateLoading()" class="template-grid">
+          <div *ngFor="let tpl of templates()" class="template-card">
+            <div class="tpl-head">
+              <span class="tpl-badge">{{ tpl.category || tpl.templateType }}</span>
+              <span class="tpl-tasks">{{ tpl.taskCount }} WBS Nodes</span>
+            </div>
+            <h4 class="tpl-title">{{ tpl.templateName }}</h4>
+            <p class="tpl-code">Mã mẫu: <code>{{ tpl.templateCode }}</code></p>
+            <p class="tpl-desc">{{ tpl.description || 'Khung mẫu kế hoạch chuẩn hóa' }}</p>
+            <button (click)="openApplyTemplateModal(tpl)" class="btn-primary btn-block mt-3">
+              🚀 Dùng mẫu này
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button (click)="closeTemplateModal()" class="btn-secondary">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Apply Template Modal -->
+  <div *ngIf="showApplyTemplateModal()" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>🚀 Khởi tạo Kế hoạch từ Mẫu "{{ selectedTemplate()?.templateName }}"</h3>
+        <button (click)="closeApplyTemplateModal()" class="close-btn">✕</button>
+      </div>
+      <form [formGroup]="applyTemplateForm" (ngSubmit)="submitApplyTemplate()" class="modal-body">
+        <div class="form-group">
+          <label>Chọn Dự án <span class="req">*</span></label>
+          <select formControlName="projectId" class="form-control">
+            <option value="">-- Chọn dự án --</option>
+            <option *ngFor="let p of projectsList()" [value]="p.id">{{ p.code }} — {{ p.name }}</option>
+          </select>
+          <small *ngIf="applyTemplateForm.get('projectId')?.touched && applyTemplateForm.get('projectId')?.invalid" class="invalid">Bắt buộc chọn dự án</small>
+        </div>
+
+        <div class="form-group">
+          <label>Mã Kế hoạch <span class="req">*</span></label>
+          <input type="text" formControlName="planCode" placeholder="VD: PLN-AGILE-01" class="form-control" />
+          <small *ngIf="applyTemplateForm.get('planCode')?.touched && applyTemplateForm.get('planCode')?.invalid" class="invalid">Mã kế hoạch từ 3-50 ký tự</small>
+        </div>
+
+        <div class="form-group">
+          <label>Tên Kế hoạch <span class="req">*</span></label>
+          <input type="text" formControlName="planName" placeholder="VD: Master Plan theo mẫu Agile Sprint" class="form-control" />
+          <small *ngIf="applyTemplateForm.get('planName')?.touched && applyTemplateForm.get('planName')?.invalid" class="invalid">Tên kế hoạch không quá 200 ký tự</small>
+        </div>
+
+        <div class="form-group">
+          <label>Ngày bắt đầu dự kiến <span class="req">*</span></label>
+          <input type="date" formControlName="startDate" class="form-control" />
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" (click)="closeApplyTemplateModal()" class="btn-secondary">Hủy</button>
+          <button type="submit" class="btn-primary" [disabled]="formSubmitting()">
+            <span *ngIf="!formSubmitting()">Tạo kế hoạch từ Mẫu</span>
+            <span *ngIf="formSubmitting()">Đang tạo...</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

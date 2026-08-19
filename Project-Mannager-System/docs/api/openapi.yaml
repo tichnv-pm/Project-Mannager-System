@@ -1,0 +1,2692 @@
+openapi: 3.1.0
+info:
+  title: PM Daily Work Management API
+  version: 1.0.0
+  description: |
+    API cho ứng dụng quản lý công việc hằng ngày của quản lý dự án phần mềm.
+
+    ## Quy ước chung
+    - Base path: `/api/v1`
+    - Xác thực: `Authorization: Bearer <accessToken>` (JWT HS256, hết hạn 15 phút). Refresh token (7 ngày) chỉ gửi ở `/auth/refresh` và `/auth/logout`.
+    - Thời gian: ISO-8601 UTC (`timestamptz`). Ngày (date): `yyyy-MM-dd`.
+    - Phân trang: `page` (≥ 0, mặc định 0), `size` (1–100, mặc định 20), `sort` (whitelist theo từng endpoint, VD `fullName,asc`).
+    - Lỗi: format thống nhất (BR-GEN-05) — `timestamp, status, error, code, message, path, fieldErrors, traceId`. Catalog mã lỗi: `docs/design/05-error-handling-design.md`.
+    - Dữ liệu đã xóa mềm: không xuất hiện ở danh sách; truy cập trực tiếp trả 404.
+    - Cập nhật bắt buộc kèm `version`; version cũ → 409.
+    - Chi tiết từng module: `docs/api/01..12-*.md`.
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development
+tags:
+  - name: Auth
+  - name: User Admin
+  - name: Dashboard
+  - name: Project
+  - name: Task
+  - name: Meeting
+  - name: Action Item
+  - name: Risk
+  - name: Issue
+  - name: Milestone
+  - name: Notification
+  - name: Report
+  - name: Audit
+paths:
+  # ============================= AUTH =============================
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Đăng nhập, cấp cặp token (access + refresh)
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Đăng nhập thành công
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '401':
+          description: Sai username/mật khẩu hoặc tài khoản INACTIVE (message chung)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Cấp cặp token mới (rotation — token cũ bị revoke)
+      operationId: refresh
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      responses:
+        '200':
+          description: Token mới
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized401' }
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Đăng xuất, revoke refresh token (idempotent)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LogoutRequest' }
+      responses:
+        '204': { description: Thành công, không body }
+        '401': { $ref: '#/components/responses/Unauthorized401' }
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Thông tin user + roles + permissions hiện tại (không chứa password hash)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Thông tin tài khoản
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized401' }
+  /auth/change-password:
+    put:
+      tags: [Auth]
+      summary: Đổi mật khẩu (revoke toàn bộ refresh token)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangePasswordRequest' }
+      responses:
+        '204': { description: Thành công, không body }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '401': { $ref: '#/components/responses/Unauthorized401' }
+  /auth/{userId}/reset-password:
+    post:
+      tags: [Auth]
+      summary: ADMIN reset mật khẩu cho user khác
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/UserIdPath' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResetPasswordRequest' }
+      responses:
+        '204': { description: Thành công, không body }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  # ============================= USER ADMIN =============================
+  /users:
+    get:
+      tags: [User Admin]
+      summary: Danh sách người dùng (search/filter/paging)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Size' }
+        - { $ref: '#/components/parameters/Sort' }
+        - { name: keyword, in: query, schema: { type: string }, description: LIKE trên username/fullName/email }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/UserStatus' } }
+        - { name: roleCode, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Trang kết quả
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserPage' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+    post:
+      tags: [User Admin]
+      summary: Tạo tài khoản (mật khẩu tạm)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserCreateRequest' }
+      responses:
+        '201':
+          description: Tạo thành công
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '409': { $ref: '#/components/responses/Duplicate409' }
+  /users/{id}:
+    get:
+      tags: [User Admin]
+      summary: Chi tiết user + vai trò + quyền
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/UserIdPath' }
+      responses:
+        '200':
+          description: Thông tin user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+    put:
+      tags: [User Admin]
+      summary: Sửa thông tin & vai trò
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/UserIdPath' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserUpdateRequest' }
+      responses:
+        '200':
+          description: Đã cập nhật
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+        '409': { $ref: '#/components/responses/Conflict409' }
+  /users/{id}/status:
+    patch:
+      tags: [User Admin]
+      summary: Kích hoạt / vô hiệu hóa tài khoản (INACTIVE → revoke refresh tokens)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/UserIdPath' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserStatusRequest' }
+      responses:
+        '200':
+          description: Đã cập nhật trạng thái
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserResponse' }
+        '400': { description: ADMIN không được vô hiệu hóa chính mình, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+        '409': { $ref: '#/components/responses/Conflict409' }
+  /roles:
+    get:
+      tags: [User Admin]
+      summary: Danh sách vai trò kèm quyền
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Danh sách vai trò
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/RoleResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+  /roles/{roleId}/permissions:
+    put:
+      tags: [User Admin]
+      summary: Gán quyền cho vai trò (thay thế toàn bộ)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: roleId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RolePermissionsRequest' }
+      responses:
+        '200':
+          description: Đã cập nhật quyền
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RoleResponse' }
+        '400': { description: Gỡ quyền cuối của ADMIN / permissionIds rỗng, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  # ============================= DASHBOARD =============================
+  /dashboard/summary:
+    get:
+      tags: [Dashboard]
+      summary: 10 nhóm số liệu tổng quan hằng ngày
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ProjectIdQuery' }
+        - { name: fromDate, in: query, schema: { type: string, format: date } }
+        - { name: toDate, in: query, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: Tổng quan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardSummaryResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+  /dashboard/task-stats:
+    get:
+      tags: [Dashboard]
+      summary: Biểu đồ tasksByStatus + tasksByPriority
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ProjectIdQuery' }
+        - { name: fromDate, in: query, schema: { type: string, format: date } }
+        - { name: toDate, in: query, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: Thống kê
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardTaskStatsResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+  /dashboard/projects/progress:
+    get:
+      tags: [Dashboard]
+      summary: Biểu đồ tiến độ dự án
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ProjectIdQuery' }
+      responses:
+        '200':
+          description: Tiến độ
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardProjectsProgressResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+  # ============================= PROJECT =============================
+  /projects:
+    get:
+      tags: [Project]
+      summary: Danh sách dự án (search/filter/paging)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Size' }
+        - { $ref: '#/components/parameters/Sort' }
+        - { name: keyword, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/ProjectStatus' } }
+        - { name: myOnly, in: query, schema: { type: boolean } }
+        - { name: projectManagerId, in: query, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Trang kết quả
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectPage' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+    post:
+      tags: [Project]
+      summary: Tạo dự án (PM trở thành thành viên)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProjectCreateRequest' }
+      responses:
+        '201':
+          description: Tạo thành công
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '409': { $ref: '#/components/responses/Duplicate409' }
+  /projects/{id}:
+    get:
+      tags: [Project]
+      summary: Chi tiết dự án
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ProjectIdPath' }
+      responses:
+        '200':
+          description: Thông tin dự án
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+    put:
+      tags: [Project]
+      summary: Cập nhật dự án (optimistic locking)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ProjectIdPath' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProjectUpdateRequest' }
+      responses:
+        '200':
+          description: Đã cập nhật
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+        '409': { $ref: '#/components/responses/Conflict409' }
+    delete:
+      tags: [Project]
+      summary: Xóa mềm dự án (confirm khi còn task mở)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ProjectIdPath' }
+        - { name: confirm, in: query, schema: { type: boolean, default: false } }
+      responses:
+        '204': { description: Thành công, không body }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  /projects/{id}/members:
+    get:
+      tags: [Project]
+      summary: Danh sách thành viên dự án
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ProjectIdPath' }
+      responses:
+        '200':
+          description: Danh sách thành viên
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ProjectMemberResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+    post:
+      tags: [Project]
+      summary: Thêm thành viên vào dự án
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ProjectIdPath' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProjectMemberRequest' }
+      responses:
+        '201':
+          description: Đã thêm
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectMemberResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+        '409': { $ref: '#/components/responses/Duplicate409' }
+  /projects/{id}/members/{userId}:
+    put:
+      tags: [Project]
+      summary: Đổi vai trò thành viên trong dự án
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ProjectIdPath' }
+        - { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProjectMemberRequest' }
+      responses:
+        '200':
+          description: Đã cập nhật vai trò
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectMemberResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+    delete:
+      tags: [Project]
+      summary: Xóa thành viên khỏi dự án (chặn xóa PM cuối)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ProjectIdPath' }
+        - { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Thành công, không body }
+        '400':
+          description: PROJECT_MANAGER_REQUIRED khi xóa PM cuối
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  # ============================= TASK =============================
+  /tasks:
+    get:
+      tags: [Task]
+      summary: Danh sách công việc (nhiều filter)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Size' }
+        - { $ref: '#/components/parameters/Sort' }
+        - { $ref: '#/components/parameters/ProjectIdQuery' }
+        - { name: keyword, in: query, schema: { type: string } }
+        - { name: assigneeId, in: query, schema: { type: string, format: uuid } }
+        - { name: status, in: query, schema: { type: array, items: { $ref: '#/components/schemas/TaskStatus' } } }
+        - { name: priority, in: query, schema: { type: array, items: { $ref: '#/components/schemas/TaskPriority' } } }
+        - { name: type, in: query, schema: { type: array, items: { $ref: '#/components/schemas/TaskType' } } }
+        - { name: tagId, in: query, schema: { type: string, format: uuid } }
+        - { name: startDateFrom, in: query, schema: { type: string, format: date } }
+        - { name: startDateTo, in: query, schema: { type: string, format: date } }
+        - { name: dueDateFrom, in: query, schema: { type: string, format: date } }
+        - { name: dueDateTo, in: query, schema: { type: string, format: date } }
+        - { name: overdue, in: query, schema: { type: boolean } }
+        - { name: blocked, in: query, schema: { type: boolean } }
+      responses:
+        '200':
+          description: Trang kết quả
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskSummaryPage' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+    post:
+      tags: [Task]
+      summary: Tạo công việc (mã tự sinh PRJXXX-TASK-000001)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaskCreateRequest' }
+      responses:
+        '201':
+          description: Tạo thành công
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  /tasks/my-tasks:
+    get:
+      tags: [Task]
+      summary: Công việc được giao cho tôi (assignee = me)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Size' }
+        - { $ref: '#/components/parameters/Sort' }
+        - { $ref: '#/components/parameters/ProjectIdQuery' }
+      responses:
+        '200':
+          description: Trang kết quả
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskSummaryPage' }
+  /tasks/today:
+    get:
+      tags: [Task]
+      summary: Công việc hạn hôm nay (theo timezone user)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Size' }
+        - { $ref: '#/components/parameters/Sort' }
+        - { $ref: '#/components/parameters/ProjectIdQuery' }
+      responses:
+        '200':
+          description: Trang kết quả
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskSummaryPage' }
+  /tasks/overdue:
+    get:
+      tags: [Task]
+      summary: Công việc quá hạn chưa đóng
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Size' }
+        - { $ref: '#/components/parameters/Sort' }
+        - { $ref: '#/components/parameters/ProjectIdQuery' }
+      responses:
+        '200':
+          description: Trang kết quả
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskSummaryPage' }
+  /tasks/export:
+    get:
+      tags: [Task]
+      summary: Xuất Excel danh sách task theo filter hiện tại
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ProjectIdQuery' }
+        - { name: keyword, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: array, items: { $ref: '#/components/schemas/TaskStatus' } } }
+        - { name: overdue, in: query, schema: { type: boolean } }
+      responses:
+        '200':
+          description: File Excel
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        '400':
+          description: EXPORT_LIMIT_EXCEEDED (quá 10.000 dòng)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+  /tasks/{id}:
+    get:
+      tags: [Task]
+      summary: Chi tiết công việc
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TaskIdPath' }
+      responses:
+        '200':
+          description: Chi tiết task
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+    put:
+      tags: [Task]
+      summary: "Cập nhật công việc (MEMBER: chỉ task của mình, trường status/progress/notes)"
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TaskIdPath' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaskUpdateRequest' }
+      responses:
+        '200':
+          description: Đã cập nhật
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+        '409': { $ref: '#/components/responses/Conflict409' }
+    delete:
+      tags: [Task]
+      summary: Xóa mềm công việc (chặn khi còn task con)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TaskIdPath' }
+      responses:
+        '204': { description: Thành công, không body }
+        '400':
+          description: BAD_REQUEST khi còn task con
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  /tasks/{id}/assignee:
+    put:
+      tags: [Task]
+      summary: Giao việc / đổi người thực hiện (sinh TASK_ASSIGNED)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TaskIdPath' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaskAssigneeRequest' }
+      responses:
+        '200':
+          description: Đã giao việc
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  /tasks/{id}/status:
+    put:
+      tags: [Task]
+      summary: Chuyển trạng thái theo state machine (DONE ⇒ progress 100 + actualCompletedAt)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TaskIdPath' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaskStatusRequest' }
+      responses:
+        '200':
+          description: Đã chuyển trạng thái
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskResponse' }
+        '400':
+          description: INVALID_STATUS_TRANSITION / BLOCKER_REASON_REQUIRED / PROGRESS_REQUIRED_FOR_DONE
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  /tasks/{id}/progress:
+    put:
+      tags: [Task]
+      summary: Cập nhật tiến độ 0–100
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TaskIdPath' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaskProgressRequest' }
+      responses:
+        '200':
+          description: Đã cập nhật
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  /tasks/{id}/blocker:
+    put:
+      tags: [Task]
+      summary: Đánh dấu / gỡ blocker (reason bắt buộc khi blocked)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TaskIdPath' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaskBlockerRequest' }
+      responses:
+        '200':
+          description: Đã cập nhật
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskResponse' }
+        '400':
+          description: BLOCKER_REASON_REQUIRED
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  /tasks/{id}/children:
+    get:
+      tags: [Task]
+      summary: Danh sách task con
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TaskIdPath' }
+      responses:
+        '200':
+          description: Task con
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/TaskSummaryResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  /tasks/{id}/tags:
+    put:
+      tags: [Task]
+      summary: Gán tag cho task (thay thế toàn bộ)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TaskIdPath' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TagIdsRequest' }
+      responses:
+        '200':
+          description: Đã cập nhật
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  /tasks/{id}/collaborators:
+    put:
+      tags: [Task]
+      summary: Đặt danh sách người phối hợp (thuộc project)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TaskIdPath' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserIdsRequest' }
+      responses:
+        '200':
+          description: Đã cập nhật
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  /tasks/{id}/watchers:
+    put:
+      tags: [Task]
+      summary: Đặt danh sách người theo dõi
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TaskIdPath' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserIdsRequest' }
+      responses:
+        '200':
+          description: Đã cập nhật
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  /tasks/{id}/comments:
+    get:
+      tags: [Task]
+      summary: Danh sách bình luận
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TaskIdPath' }
+      responses:
+        '200':
+          description: Bình luận
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CommentResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+    post:
+      tags: [Task]
+      summary: Thêm bình luận (sinh TASK_COMMENTED cho assignee/watchers)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TaskIdPath' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CommentRequest' }
+      responses:
+        '201':
+          description: Đã thêm
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CommentResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  /tasks/{id}/comments/{commentId}:
+    put:
+      tags: [Task]
+      summary: Sửa bình luận (chỉ tác giả)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TaskIdPath' }
+        - { name: commentId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CommentRequest' }
+      responses:
+        '200':
+          description: Đã sửa
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CommentResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+    delete:
+      tags: [Task]
+      summary: Xóa bình luận (chỉ tác giả)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TaskIdPath' }
+        - { name: commentId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Thành công, không body }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  /tasks/{id}/attachments:
+    get:
+      tags: [Task]
+      summary: Danh sách file đính kèm
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TaskIdPath' }
+      responses:
+        '200':
+          description: File đính kèm
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AttachmentResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+    post:
+      tags: [Task]
+      summary: Upload file đính kèm (≤ 10MB, whitelist mime)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TaskIdPath' }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required: [file]
+      responses:
+        '201':
+          description: Đã upload
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AttachmentResponse' }
+        '400':
+          description: Sai mime type
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge413' }
+  /tasks/{id}/attachments/{attachmentId}:
+    delete:
+      tags: [Task]
+      summary: Xóa file đính kèm (xóa khỏi storage + bản ghi)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TaskIdPath' }
+        - { name: attachmentId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Thành công, không body }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  /tasks/{id}/history:
+    get:
+      tags: [Task]
+      summary: Lịch sử thay đổi (đọc từ audit_logs)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TaskIdPath' }
+      responses:
+        '200':
+          description: Lịch sử
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/TaskHistoryEntry' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  # ============================= MEETING =============================
+  /meetings:
+    get:
+      tags: [Meeting]
+      summary: Danh sách cuộc họp
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Size' }
+        - { $ref: '#/components/parameters/Sort' }
+        - { $ref: '#/components/parameters/ProjectIdQuery' }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/MeetingStatus' } }
+        - { name: fromTime, in: query, schema: { type: string, format: date-time } }
+        - { name: toTime, in: query, schema: { type: string, format: date-time } }
+        - { name: keyword, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Trang kết quả
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MeetingPage' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+    post:
+      tags: [Meeting]
+      summary: Lên lịch cuộc họp (sinh MEETING_INVITED)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MeetingCreateRequest' }
+      responses:
+        '201':
+          description: Đã tạo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MeetingResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  /meetings/today:
+    get:
+      tags: [Meeting]
+      summary: Cuộc họp hôm nay
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Danh sách họp hôm nay
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MeetingResponse' }
+  /meetings/{id}:
+    get:
+      tags: [Meeting]
+      summary: Chi tiết cuộc họp (biên bản + action items + attachments)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/MeetingIdPath' }
+      responses:
+        '200':
+          description: Chi tiết họp
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MeetingResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+    put:
+      tags: [Meeting]
+      summary: Cập nhật cuộc họp
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/MeetingIdPath' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MeetingUpdateRequest' }
+      responses:
+        '200':
+          description: Đã cập nhật
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MeetingResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+        '409': { $ref: '#/components/responses/Conflict409' }
+    delete:
+      tags: [Meeting]
+      summary: Xóa mềm cuộc họp
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/MeetingIdPath' }
+      responses:
+        '204': { description: Thành công, không body }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  /meetings/{id}/complete:
+    put:
+      tags: [Meeting]
+      summary: Hoàn thành họp, khóa biên bản (bắt buộc conclusion)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/MeetingIdPath' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MeetingCompleteRequest' }
+      responses:
+        '200':
+          description: Đã hoàn thành
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MeetingResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  /meetings/{id}/participants:
+    put:
+      tags: [Meeting]
+      summary: Thêm/bớt người tham gia
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/MeetingIdPath' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MeetingParticipantsRequest' }
+      responses:
+        '200':
+          description: Đã cập nhật
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MeetingResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  /meetings/{id}/attachments:
+    get:
+      tags: [Meeting]
+      summary: File đính kèm biên bản
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/MeetingIdPath' }
+      responses:
+        '200':
+          description: File đính kèm
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AttachmentResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+    post:
+      tags: [Meeting]
+      summary: Upload file biên bản
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/MeetingIdPath' }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required: [file]
+      responses:
+        '201':
+          description: Đã upload
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AttachmentResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge413' }
+  /meetings/{id}/attachments/{attachmentId}:
+    delete:
+      tags: [Meeting]
+      summary: Xóa file biên bản
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/MeetingIdPath' }
+        - { name: attachmentId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Thành công, không body }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  # ============================= ACTION ITEM =============================
+  /action-items:
+    get:
+      tags: [Action Item]
+      summary: Danh sách action item
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Size' }
+        - { $ref: '#/components/parameters/Sort' }
+        - { $ref: '#/components/parameters/ProjectIdQuery' }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/ActionItemStatus' } }
+        - { name: assigneeId, in: query, schema: { type: string, format: uuid } }
+        - { name: overdue, in: query, schema: { type: boolean } }
+      responses:
+        '200':
+          description: Trang kết quả
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActionItemPage' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+    post:
+      tags: [Action Item]
+      summary: Tạo action item từ cuộc họp (sinh ACTION_ITEM_ASSIGNED)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ActionItemCreateRequest' }
+      responses:
+        '201':
+          description: Đã tạo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActionItemResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  /action-items/overdue:
+    get:
+      tags: [Action Item]
+      summary: Action item quá hạn chưa đóng
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Size' }
+        - { $ref: '#/components/parameters/Sort' }
+        - { $ref: '#/components/parameters/ProjectIdQuery' }
+      responses:
+        '200':
+          description: Trang kết quả
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActionItemPage' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+  /action-items/{id}:
+    get:
+      tags: [Action Item]
+      summary: Chi tiết action item
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ActionItemIdPath' }
+      responses:
+        '200':
+          description: Chi tiết
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActionItemResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+    put:
+      tags: [Action Item]
+      summary: "Cập nhật (assignee: chỉ status/progress)"
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ActionItemIdPath' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ActionItemUpdateRequest' }
+      responses:
+        '200':
+          description: Đã cập nhật
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActionItemResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+        '409': { $ref: '#/components/responses/Conflict409' }
+    delete:
+      tags: [Action Item]
+      summary: Xóa action item
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ActionItemIdPath' }
+      responses:
+        '204': { description: Thành công, không body }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  /action-items/{id}/convert-to-task:
+    post:
+      tags: [Action Item]
+      summary: Chuyển action item thành task (liên kết 1–1)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ActionItemIdPath' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConvertToTaskRequest' }
+      responses:
+        '201':
+          description: Task được tạo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+        '409':
+          description: ALREADY_LINKED — action item đã có linked task
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  # ============================= RISK =============================
+  /risks:
+    get:
+      tags: [Risk]
+      summary: Danh sách risk
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Size' }
+        - { $ref: '#/components/parameters/Sort' }
+        - { $ref: '#/components/parameters/ProjectIdQuery' }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/RiskStatus' } }
+        - { name: level, in: query, schema: { $ref: '#/components/schemas/RiskLevel' } }
+        - { name: ownerId, in: query, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Trang kết quả
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RiskPage' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+    post:
+      tags: [Risk]
+      summary: Tạo risk (mã tự sinh RSK000001, level tự tính)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RiskCreateRequest' }
+      responses:
+        '201':
+          description: Đã tạo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RiskResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  /risks/{id}:
+    get:
+      tags: [Risk]
+      summary: Chi tiết risk
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/RiskIdPath' }
+      responses:
+        '200':
+          description: Chi tiết
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RiskResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+    put:
+      tags: [Risk]
+      summary: "Cập nhật risk (owner: chỉ status)"
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/RiskIdPath' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RiskUpdateRequest' }
+      responses:
+        '200':
+          description: Đã cập nhật
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RiskResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+        '409': { $ref: '#/components/responses/Conflict409' }
+    delete:
+      tags: [Risk]
+      summary: Xóa mềm risk
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/RiskIdPath' }
+      responses:
+        '204': { description: Thành công, không body }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  /risks/{id}/convert-to-issue:
+    post:
+      tags: [Risk]
+      summary: Chuyển risk OCCURRED thành issue (liên kết 1–1)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/RiskIdPath' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConvertToIssueRequest' }
+      responses:
+        '201':
+          description: Issue được tạo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IssueResponse' }
+        '400':
+          description: BAD_REQUEST khi risk chưa OCCURRED
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+        '409':
+          description: ALREADY_LINKED
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  # ============================= ISSUE =============================
+  /issues:
+    get:
+      tags: [Issue]
+      summary: Danh sách issue
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Size' }
+        - { $ref: '#/components/parameters/Sort' }
+        - { $ref: '#/components/parameters/ProjectIdQuery' }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/IssueStatus' } }
+        - { name: severity, in: query, schema: { $ref: '#/components/schemas/IssueSeverity' } }
+        - { name: ownerId, in: query, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Trang kết quả
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IssuePage' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+    post:
+      tags: [Issue]
+      summary: Tạo issue (mã tự sinh ISS000001)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IssueCreateRequest' }
+      responses:
+        '201':
+          description: Đã tạo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IssueResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  /issues/{id}:
+    get:
+      tags: [Issue]
+      summary: Chi tiết issue
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/IssueIdPath' }
+      responses:
+        '200':
+          description: Chi tiết
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IssueResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+    put:
+      tags: [Issue]
+      summary: "Cập nhật issue (RESOLVED tự ghi resolvedAt; owner: chỉ status)"
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/IssueIdPath' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IssueUpdateRequest' }
+      responses:
+        '200':
+          description: Đã cập nhật
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IssueResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+        '409': { $ref: '#/components/responses/Conflict409' }
+    delete:
+      tags: [Issue]
+      summary: Xóa mềm issue
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/IssueIdPath' }
+      responses:
+        '204': { description: Thành công, không body }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  # ============================= MILESTONE =============================
+  /milestones:
+    get:
+      tags: [Milestone]
+      summary: Danh sách milestone
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Size' }
+        - { name: sort, in: query, schema: { type: string, default: plannedDate,asc } }
+        - { $ref: '#/components/parameters/ProjectIdQuery' }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/MilestoneStatus' } }
+      responses:
+        '200':
+          description: Trang kết quả
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MilestonePage' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+    post:
+      tags: [Milestone]
+      summary: Tạo milestone
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MilestoneCreateRequest' }
+      responses:
+        '201':
+          description: Đã tạo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MilestoneResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  /milestones/{id}:
+    get:
+      tags: [Milestone]
+      summary: Chi tiết milestone
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/MilestoneIdPath' }
+      responses:
+        '200':
+          description: Chi tiết
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MilestoneResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+    put:
+      tags: [Milestone]
+      summary: Cập nhật milestone (COMPLETED ⇒ progress 100, actualDate tự ghi)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/MilestoneIdPath' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MilestoneUpdateRequest' }
+      responses:
+        '200':
+          description: Đã cập nhật
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MilestoneResponse' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+        '409': { $ref: '#/components/responses/Conflict409' }
+    delete:
+      tags: [Milestone]
+      summary: Xóa mềm milestone
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/MilestoneIdPath' }
+      responses:
+        '204': { description: Thành công, không body }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  # ============================= NOTIFICATION =============================
+  /notifications:
+    get:
+      tags: [Notification]
+      summary: Danh sách thông báo của tôi
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Size' }
+        - { name: unreadOnly, in: query, schema: { type: boolean, default: false } }
+        - { name: type, in: query, schema: { $ref: '#/components/schemas/NotificationType' } }
+      responses:
+        '200':
+          description: Trang kết quả
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationPage' }
+  /notifications/unread-count:
+    get:
+      tags: [Notification]
+      summary: Số thông báo chưa đọc
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Số chưa đọc
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  unreadCount:
+                    type: integer
+  /notifications/{id}/read:
+    put:
+      tags: [Notification]
+      summary: Đánh dấu đã đọc một thông báo
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Đã đánh dấu
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationResponse' }
+        '404': { $ref: '#/components/responses/NotFound404' }
+  /notifications/read-all:
+    put:
+      tags: [Notification]
+      summary: Đánh dấu tất cả đã đọc
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Số bản ghi được cập nhật
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updatedCount:
+                    type: integer
+  # ============================= REPORT =============================
+  /reports/tasks-by-status:
+    get:
+      tags: [Report]
+      summary: Báo cáo task theo trạng thái
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ProjectIdQueryRequired' }
+        - { name: fromDate, in: query, schema: { type: string, format: date } }
+        - { name: toDate, in: query, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: Thống kê
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StatusCountItems' }
+        '400': { $ref: '#/components/responses/Validation400' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+  /reports/tasks-by-assignee:
+    get:
+      tags: [Report]
+      summary: Báo cáo task theo người thực hiện
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ProjectIdQueryRequired' }
+        - { name: fromDate, in: query, schema: { type: string, format: date } }
+        - { name: toDate, in: query, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: Thống kê
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssigneeCountItems' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+  /reports/overdue-tasks:
+    get:
+      tags: [Report]
+      summary: Báo cáo task quá hạn (chi tiết)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ProjectIdQueryRequired' }
+        - { $ref: '#/components/parameters/Page' }
+        - { name: size, in: query, schema: { type: integer, maximum: 100, default: 50 } }
+      responses:
+        '200':
+          description: Trang kết quả
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskSummaryPage' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+  /reports/project-progress:
+    get:
+      tags: [Report]
+      summary: Báo cáo tiến độ dự án
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: projectId, in: query, required: true, schema: { type: array, items: { type: string, format: uuid }, maxItems: 50 } }
+      responses:
+        '200':
+          description: Tiến độ
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectProgressReportResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+  /reports/risk-issue-summary:
+    get:
+      tags: [Report]
+      summary: Tổng hợp risk & issue mở
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ProjectIdQueryRequired' }
+      responses:
+        '200':
+          description: Tổng hợp
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RiskIssueSummaryResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+  /reports/export:
+    get:
+      tags: [Report]
+      summary: Xuất file báo cáo (xlsx/csv)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: report, in: query, required: true, schema: { type: string, enum: [tasks-by-status, tasks-by-assignee, overdue-tasks, project-progress, risk-issue-summary] } }
+        - { name: format, in: query, schema: { type: string, enum: [xlsx, csv], default: xlsx } }
+        - { $ref: '#/components/parameters/ProjectIdQuery' }
+        - { name: fromDate, in: query, schema: { type: string, format: date } }
+        - { name: toDate, in: query, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: File báo cáo
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+            text/csv:
+              schema: { type: string, format: binary }
+        '400':
+          description: EXPORT_LIMIT_EXCEEDED
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+  # ============================= AUDIT =============================
+  /audit-logs:
+    get:
+      tags: [Audit]
+      summary: Nhật ký hoạt động (chỉ ADMIN)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Size' }
+        - { name: sort, in: query, schema: { type: string, default: createdAt,desc } }
+        - { name: actorId, in: query, schema: { type: string, format: uuid } }
+        - { name: action, in: query, schema: { type: string } }
+        - { name: entityType, in: query, schema: { type: string } }
+        - { name: entityId, in: query, schema: { type: string, format: uuid } }
+        - { name: fromDate, in: query, schema: { type: string, format: date-time } }
+        - { name: toDate, in: query, schema: { type: string, format: date-time } }
+      responses:
+        '200':
+          description: Trang kết quả
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuditLogPage' }
+        '403': { $ref: '#/components/responses/Forbidden403' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 0, default: 0 }
+      description: Số trang (từ 0)
+    Size:
+      name: size
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      description: Số bản ghi mỗi trang
+    Sort:
+      name: sort
+      in: query
+      schema: { type: string }
+      description: 'Sắp xếp theo whitelist của endpoint, VD `fullName,asc`'
+    ProjectIdPath:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+      description: ID dự án
+    ProjectIdQuery:
+      name: projectId
+      in: query
+      schema: { type: string, format: uuid }
+      description: Lọc theo dự án
+    ProjectIdQueryRequired:
+      name: projectId
+      in: query
+      required: true
+      schema: { type: string, format: uuid }
+      description: ID dự án (bắt buộc)
+    UserIdPath:
+      name: userId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+      description: ID người dùng
+    TaskIdPath:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+      description: ID công việc
+    MeetingIdPath:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+      description: ID cuộc họp
+    ActionItemIdPath:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+      description: ID action item
+    RiskIdPath:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+      description: ID risk
+    IssueIdPath:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+      description: ID issue
+    MilestoneIdPath:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+      description: ID milestone
+  responses:
+    Validation400:
+      description: Dữ liệu không hợp lệ
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Unauthorized401:
+      description: Token thiếu/sai/hết hạn
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Forbidden403:
+      description: Không đủ quyền hoặc ngoài phạm vi dữ liệu
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound404:
+      description: Không tìm thấy (bao gồm dữ liệu đã xóa mềm)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Conflict409:
+      description: Xung đột optimistic locking (version cũ)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Duplicate409:
+      description: Dữ liệu trùng (username/email/mã)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    PayloadTooLarge413:
+      description: File vượt quá kích thước cho phép (10MB)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+  schemas:
+    # ---------- Chung ----------
+    ErrorResponse:
+      type: object
+      required: [timestamp, status, error, code, message, path, fieldErrors, traceId]
+      properties:
+        timestamp: { type: string, format: date-time, example: '2026-08-01T10:00:00Z' }
+        status: { type: integer, example: 400 }
+        error: { type: string, example: BAD_REQUEST }
+        code: { type: string, example: VALIDATION_ERROR }
+        message: { type: string, example: 'Dữ liệu không hợp lệ' }
+        path: { type: string, example: /api/v1/tasks }
+        fieldErrors:
+          type: array
+          items:
+            type: object
+            properties:
+              field: { type: string }
+              message: { type: string }
+        traceId: { type: string, example: a1b2c3d4-1234 }
+    PageResponse:
+      type: object
+      required: [content, page, size, totalElements, totalPages, hasNext, hasPrevious]
+      properties:
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+        hasNext: { type: boolean }
+        hasPrevious: { type: boolean }
+    UserRef:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        fullName: { type: string }
+    # ---------- Enum ----------
+    UserStatus: { type: string, enum: [ACTIVE, INACTIVE] }
+    TaskStatus: { type: string, enum: [TODO, IN_PROGRESS, BLOCKED, REVIEW, DONE, CANCELLED] }
+    TaskPriority: { type: string, enum: [LOW, MEDIUM, HIGH, CRITICAL] }
+    TaskType: { type: string, enum: [FEATURE, BUG, IMPROVEMENT, TASK, OTHER] }
+    TaskSource: { type: string, enum: [MANUAL, MEETING, ACTION_ITEM, ISSUE, OTHER] }
+    ProjectStatus: { type: string, enum: [PLANNING, ACTIVE, ON_HOLD, COMPLETED, CANCELLED] }
+    ProjectMemberRole: { type: string, enum: [PROJECT_MANAGER, TECH_LEAD, BUSINESS_ANALYST, DEVELOPER, TESTER, DEVOPS, MEMBER] }
+    MeetingStatus: { type: string, enum: [SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED] }
+    ActionItemStatus: { type: string, enum: [OPEN, IN_PROGRESS, DONE, CANCELLED] }
+    RiskStatus: { type: string, enum: [OPEN, MONITORING, MITIGATED, OCCURRED, CLOSED] }
+    RiskLevel: { type: string, enum: [LOW, MEDIUM, HIGH, CRITICAL] }
+    RiskProbability: { type: string, enum: [LOW, MEDIUM, HIGH] }
+    RiskImpact: { type: string, enum: [LOW, MEDIUM, HIGH] }
+    IssueSeverity: { type: string, enum: [LOW, MEDIUM, HIGH, CRITICAL] }
+    IssueStatus: { type: string, enum: [OPEN, ANALYZING, IN_PROGRESS, RESOLVED, CLOSED, REJECTED] }
+    MilestoneStatus: { type: string, enum: [NOT_STARTED, IN_PROGRESS, COMPLETED, DELAYED, CANCELLED] }
+    NotificationType: { type: string, enum: [TASK_ASSIGNED, TASK_DUE_SOON, TASK_OVERDUE, TASK_COMMENTED, MEETING_INVITED, ACTION_ITEM_ASSIGNED] }
+    # ---------- Auth ----------
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string, minLength: 3, maxLength: 50 }
+        password: { type: string, minLength: 8, maxLength: 72 }
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string }
+    LogoutRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string }
+    ChangePasswordRequest:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword: { type: string }
+        newPassword:
+          type: string
+          minLength: 8
+          maxLength: 72
+          description: '≥ 8 ký tự, chữ thường + hoa + số + ký tự đặc biệt (BR-AUTH-02)'
+    ResetPasswordRequest:
+      type: object
+      required: [newPassword]
+      properties:
+        newPassword: { type: string, minLength: 8, maxLength: 72 }
+    TokenResponse:
+      type: object
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        tokenType: { type: string, example: Bearer }
+        expiresIn: { type: integer, description: 'Giây (900)' }
+        user: { $ref: '#/components/schemas/UserResponse' }
+    UserResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        username: { type: string }
+        fullName: { type: string }
+        email: { type: string, format: email }
+        status: { $ref: '#/components/schemas/UserStatus' }
+        roles:
+          type: array
+          items: { type: string }
+        permissions:
+          type: array
+          items: { type: string }
+        createdAt: { type: string, format: date-time }
+    UserCreateRequest:
+      type: object
+      required: [username, email, fullName, password]
+      properties:
+        username: { type: string, minLength: 3, maxLength: 50 }
+        email: { type: string, format: email, maxLength: 100 }
+        fullName: { type: string, maxLength: 100 }
+        password: { type: string, minLength: 8, maxLength: 72 }
+        status: { $ref: '#/components/schemas/UserStatus' }
+        roleIds:
+          type: array
+          items: { type: string, format: uuid }
+    UserUpdateRequest:
+      type: object
+      required: [fullName, email, version]
+      properties:
+        fullName: { type: string, maxLength: 100 }
+        email: { type: string, format: email, maxLength: 100 }
+        roleIds:
+          type: array
+          items: { type: string, format: uuid }
+        version: { type: integer }
+    UserStatusRequest:
+      type: object
+      required: [status, version]
+      properties:
+        status: { $ref: '#/components/schemas/UserStatus' }
+        version: { type: integer }
+    RoleResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        description: { type: string }
+        permissions:
+          type: array
+          items: { type: string }
+    RolePermissionsRequest:
+      type: object
+      required: [permissionIds]
+      properties:
+        permissionIds:
+          type: array
+          minItems: 1
+          items: { type: string, format: uuid }
+    UserPage:
+      allOf:
+        - { $ref: '#/components/schemas/PageResponse' }
+        - type: object
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/UserResponse' }
+    # ---------- Dashboard ----------
+    DashboardSummaryResponse:
+      type: object
+      properties:
+        totalTasksToday: { type: integer }
+        overdueTasks: { type: integer }
+        upcomingTasks: { type: integer }
+        inProgressTasks: { type: integer }
+        blockedTasks: { type: integer }
+        meetingsToday: { type: integer }
+        pendingActionItems: { type: integer }
+        highRisks: { type: integer }
+        openIssues: { type: integer }
+        upcomingMilestones: { type: integer }
+    DashboardTaskStatsResponse:
+      type: object
+      properties:
+        tasksByStatus:
+          type: array
+          items:
+            type: object
+            properties:
+              status: { $ref: '#/components/schemas/TaskStatus' }
+              count: { type: integer }
+        tasksByPriority:
+          type: array
+          items:
+            type: object
+            properties:
+              priority: { $ref: '#/components/schemas/TaskPriority' }
+              count: { type: integer }
+    DashboardProjectsProgressResponse:
+      type: object
+      properties:
+        projects:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectProgressItem' }
+    ProjectProgressItem:
+      type: object
+      properties:
+        projectId: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        progress: { type: integer, minimum: 0, maximum: 100 }
+    # ---------- Project ----------
+    ProjectCreateRequest:
+      type: object
+      required: [code, name]
+      properties:
+        code: { type: string, minLength: 3, maxLength: 20 }
+        name: { type: string, maxLength: 100 }
+        description: { type: string }
+        startDate: { type: string, format: date }
+        endDate: { type: string, format: date }
+        customerName: { type: string, maxLength: 100 }
+        projectManagerId: { type: string, format: uuid }
+        note: { type: string }
+    ProjectUpdateRequest:
+      allOf:
+        - { $ref: '#/components/schemas/ProjectCreateRequest' }
+        - type: object
+          required: [version]
+          properties:
+            version: { type: integer }
+    ProjectResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        description: { type: string }
+        status: { $ref: '#/components/schemas/ProjectStatus' }
+        startDate: { type: string, format: date }
+        endDate: { type: string, format: date }
+        projectManagerId: { type: string, format: uuid }
+        customerName: { type: string }
+        progress: { type: integer }
+        memberCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+        version: { type: integer }
+    ProjectMemberRequest:
+      type: object
+      required: [userId, role]
+      properties:
+        userId: { type: string, format: uuid }
+        role: { $ref: '#/components/schemas/ProjectMemberRole' }
+    ProjectMemberResponse:
+      type: object
+      properties:
+        userId: { type: string, format: uuid }
+        username: { type: string }
+        fullName: { type: string }
+        email: { type: string }
+        role: { $ref: '#/components/schemas/ProjectMemberRole' }
+        joinedAt: { type: string, format: date-time }
+    ProjectPage:
+      allOf:
+        - { $ref: '#/components/schemas/PageResponse' }
+        - type: object
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/ProjectResponse' }
+    # ---------- Task ----------
+    TaskCreateRequest:
+      type: object
+      required: [projectId, title]
+      properties:
+        projectId: { type: string, format: uuid }
+        parentTaskId: { type: string, format: uuid }
+        title: { type: string, maxLength: 200 }
+        description: { type: string }
+        assigneeId: { type: string, format: uuid }
+        collaboratorIds:
+          type: array
+          items: { type: string, format: uuid }
+        watcherIds:
+          type: array
+          items: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/TaskStatus' }
+        priority: { $ref: '#/components/schemas/TaskPriority' }
+        type: { $ref: '#/components/schemas/TaskType' }
+        source: { $ref: '#/components/schemas/TaskSource' }
+        startDate: { type: string, format: date }
+        dueDate: { type: string, format: date }
+        progress: { type: integer, minimum: 0, maximum: 100 }
+        blocked: { type: boolean }
+        blockerReason: { type: string, maxLength: 500 }
+        estimateMinutes: { type: integer, minimum: 0 }
+        notes: { type: string }
+        tagIds:
+          type: array
+          items: { type: string, format: uuid }
+    TaskUpdateRequest:
+      allOf:
+        - { $ref: '#/components/schemas/TaskCreateRequest' }
+        - type: object
+          required: [version]
+          properties:
+            version: { type: integer }
+    TaskAssigneeRequest:
+      type: object
+      properties:
+        assigneeId:
+          type: string
+          format: uuid
+          nullable: true
+          description: null để gỡ người thực hiện
+    TaskStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { $ref: '#/components/schemas/TaskStatus' }
+        blockerReason: { type: string, maxLength: 500, description: 'Bắt buộc khi status = BLOCKED' }
+    TaskProgressRequest:
+      type: object
+      required: [progress]
+      properties:
+        progress: { type: integer, minimum: 0, maximum: 100 }
+    TaskBlockerRequest:
+      type: object
+      required: [blocked]
+      properties:
+        blocked: { type: boolean }
+        blockerReason: { type: string, maxLength: 500, description: 'Bắt buộc khi blocked = true' }
+    TagIdsRequest:
+      type: object
+      required: [tagIds]
+      properties:
+        tagIds:
+          type: array
+          items: { type: string, format: uuid }
+    UserIdsRequest:
+      type: object
+      required: [userIds]
+      properties:
+        userIds:
+          type: array
+          items: { type: string, format: uuid }
+    CommentRequest:
+      type: object
+      required: [content]
+      properties:
+        content: { type: string, minLength: 1, maxLength: 2000 }
+    CommentResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        content: { type: string }
+        createdBy: { $ref: '#/components/schemas/UserRef' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    AttachmentResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        fileName: { type: string }
+        fileUrl: { type: string }
+        contentType: { type: string }
+        sizeBytes: { type: integer }
+        uploadedBy: { $ref: '#/components/schemas/UserRef' }
+        createdAt: { type: string, format: date-time }
+    TaskResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, example: PRJ001-TASK-000001 }
+        projectId: { type: string, format: uuid }
+        projectCode: { type: string }
+        projectName: { type: string }
+        parentTaskId: { type: string, format: uuid, nullable: true }
+        title: { type: string }
+        description: { type: string }
+        reporter: { $ref: '#/components/schemas/UserRef' }
+        assignee: { $ref: '#/components/schemas/UserRef' }
+        status: { $ref: '#/components/schemas/TaskStatus' }
+        priority: { $ref: '#/components/schemas/TaskPriority' }
+        type: { $ref: '#/components/schemas/TaskType' }
+        source: { $ref: '#/components/schemas/TaskSource' }
+        startDate: { type: string, format: date, nullable: true }
+        dueDate: { type: string, format: date, nullable: true }
+        actualCompletedAt: { type: string, format: date-time, nullable: true }
+        progress: { type: integer }
+        blocked: { type: boolean }
+        blockerReason: { type: string, nullable: true }
+        estimateMinutes: { type: integer, nullable: true }
+        actualMinutes: { type: integer, nullable: true }
+        notes: { type: string }
+        tags:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              name: { type: string }
+              color: { type: string }
+        collaborators:
+          type: array
+          items: { $ref: '#/components/schemas/UserRef' }
+        watchers:
+          type: array
+          items: { $ref: '#/components/schemas/UserRef' }
+        commentCount: { type: integer }
+        attachmentCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        version: { type: integer }
+    TaskSummaryResponse:
+      allOf:
+        - { $ref: '#/components/schemas/TaskResponse' }
+        - type: object
+          description: Rút gọn cho danh sách (bỏ description/notes đầy đủ nếu cần)
+    TaskHistoryEntry:
+      type: object
+      properties:
+        changedAt: { type: string, format: date-time }
+        changedBy: { type: string, format: uuid }
+        changedByUsername: { type: string }
+        action: { type: string }
+        changes:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              from: { type: object, nullable: true }
+              to: { type: object, nullable: true }
+    TaskSummaryPage:
+      allOf:
+        - { $ref: '#/components/schemas/PageResponse' }
+        - type: object
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/TaskSummaryResponse' }
+    # ---------- Meeting ----------
+    MeetingCreateRequest:
+      type: object
+      required: [projectId, title, startTime, endTime, chairpersonId]
+      properties:
+        projectId: { type: string, format: uuid }
+        title: { type: string, maxLength: 200 }
+        startTime: { type: string, format: date-time }
+        endTime: { type: string, format: date-time }
+        location: { type: string, maxLength: 255 }
+        meetingLink: { type: string, maxLength: 500 }
+        chairpersonId: { type: string, format: uuid }
+        participantIds:
+          type: array
+          uniqueItems: true
+          items: { type: string, format: uuid }
+        agenda: { type: string }
+        status: { $ref: '#/components/schemas/MeetingStatus' }
+    MeetingUpdateRequest:
+      allOf:
+        - { $ref: '#/components/schemas/MeetingCreateRequest' }
+        - type: object
+          required: [version]
+          properties:
+            version: { type: integer }
+    MeetingCompleteRequest:
+      type: object
+      required: [conclusion]
+      properties:
+        content: { type: string }
+        conclusion: { type: string }
+    MeetingParticipantsRequest:
+      type: object
+      properties:
+        add:
+          type: array
+          items: { type: string, format: uuid }
+        remove:
+          type: array
+          items: { type: string, format: uuid }
+    MeetingResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        projectCode: { type: string }
+        projectName: { type: string }
+        title: { type: string }
+        startTime: { type: string, format: date-time }
+        endTime: { type: string, format: date-time }
+        location: { type: string, nullable: true }
+        meetingLink: { type: string, nullable: true }
+        chairperson: { $ref: '#/components/schemas/UserRef' }
+        participants:
+          type: array
+          items: { $ref: '#/components/schemas/UserRef' }
+        status: { $ref: '#/components/schemas/MeetingStatus' }
+        agenda: { type: string }
+        content: { type: string }
+        conclusion: { type: string }
+        actionItems:
+          type: array
+          items: { $ref: '#/components/schemas/ActionItemSummary' }
+        attachments:
+          type: array
+          items: { $ref: '#/components/schemas/AttachmentResponse' }
+        createdAt: { type: string, format: date-time }
+        version: { type: integer }
+    MeetingPage:
+      allOf:
+        - { $ref: '#/components/schemas/PageResponse' }
+        - type: object
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/MeetingResponse' }
+    # ---------- Action Item ----------
+    ActionItemCreateRequest:
+      type: object
+      required: [meetingId, projectId, title, assigneeId]
+      properties:
+        meetingId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        title: { type: string, maxLength: 200 }
+        description: { type: string }
+        assigneeId: { type: string, format: uuid }
+        dueDate: { type: string, format: date }
+        priority: { $ref: '#/components/schemas/TaskPriority' }
+    ActionItemUpdateRequest:
+      type: object
+      required: [version]
+      properties:
+        title: { type: string, maxLength: 200 }
+        description: { type: string }
+        dueDate: { type: string, format: date }
+        priority: { $ref: '#/components/schemas/TaskPriority' }
+        status: { $ref: '#/components/schemas/ActionItemStatus' }
+        progress: { type: integer, minimum: 0, maximum: 100 }
+        version: { type: integer }
+    ConvertToTaskRequest:
+      type: object
+      properties:
+        dueDate: { type: string, format: date }
+        priority: { $ref: '#/components/schemas/TaskPriority' }
+    ActionItemResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        meetingId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        title: { type: string }
+        description: { type: string }
+        assignee: { $ref: '#/components/schemas/UserRef' }
+        dueDate: { type: string, format: date, nullable: true }
+        priority: { $ref: '#/components/schemas/TaskPriority' }
+        status: { $ref: '#/components/schemas/ActionItemStatus' }
+        progress: { type: integer }
+        linkedTaskId: { type: string, format: uuid, nullable: true }
+        createdAt: { type: string, format: date-time }
+        version: { type: integer }
+    ActionItemSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        assignee: { $ref: '#/components/schemas/UserRef' }
+        dueDate: { type: string, format: date, nullable: true }
+        status: { $ref: '#/components/schemas/ActionItemStatus' }
+    ActionItemPage:
+      allOf:
+        - { $ref: '#/components/schemas/PageResponse' }
+        - type: object
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/ActionItemResponse' }
+    # ---------- Risk ----------
+    RiskCreateRequest:
+      type: object
+      required: [projectId, title, probability, impact, ownerId]
+      properties:
+        projectId: { type: string, format: uuid }
+        title: { type: string, maxLength: 200 }
+        description: { type: string }
+        probability: { $ref: '#/components/schemas/RiskProbability' }
+        impact: { $ref: '#/components/schemas/RiskImpact' }
+        level:
+          $ref: '#/components/schemas/RiskLevel'
+          description: Tự tính theo xác suất × ảnh hưởng nếu bỏ trống
+        ownerId: { type: string, format: uuid }
+        mitigationPlan: { type: string }
+        contingencyPlan: { type: string }
+        status: { $ref: '#/components/schemas/RiskStatus' }
+        dueDate: { type: string, format: date }
+    RiskUpdateRequest:
+      allOf:
+        - { $ref: '#/components/schemas/RiskCreateRequest' }
+        - type: object
+          required: [version]
+          properties:
+            version: { type: integer }
+    ConvertToIssueRequest:
+      type: object
+      properties:
+        severity: { $ref: '#/components/schemas/IssueSeverity' }
+        dueDate: { type: string, format: date }
+    RiskResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, example: RSK000001 }
+        projectId: { type: string, format: uuid }
+        title: { type: string }
+        description: { type: string }
+        probability: { $ref: '#/components/schemas/RiskProbability' }
+        impact: { $ref: '#/components/schemas/RiskImpact' }
+        level: { $ref: '#/components/schemas/RiskLevel' }
+        owner: { $ref: '#/components/schemas/UserRef' }
+        mitigationPlan: { type: string }
+        contingencyPlan: { type: string }
+        status: { $ref: '#/components/schemas/RiskStatus' }
+        dueDate: { type: string, format: date, nullable: true }
+        linkedIssueId: { type: string, format: uuid, nullable: true }
+        createdAt: { type: string, format: date-time }
+        version: { type: integer }
+    RiskPage:
+      allOf:
+        - { $ref: '#/components/schemas/PageResponse' }
+        - type: object
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/RiskResponse' }
+    # ---------- Issue ----------
+    IssueCreateRequest:
+      type: object
+      required: [projectId, title, severity, ownerId]
+      properties:
+        projectId: { type: string, format: uuid }
+        title: { type: string, maxLength: 200 }
+        description: { type: string }
+        severity: { $ref: '#/components/schemas/IssueSeverity' }
+        ownerId: { type: string, format: uuid }
+        rootCause: { type: string }
+        solution: { type: string }
+        status: { $ref: '#/components/schemas/IssueStatus' }
+        dueDate: { type: string, format: date }
+    IssueUpdateRequest:
+      allOf:
+        - { $ref: '#/components/schemas/IssueCreateRequest' }
+        - type: object
+          required: [version]
+          properties:
+            version: { type: integer }
+    IssueResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, example: ISS000001 }
+        projectId: { type: string, format: uuid }
+        title: { type: string }
+        description: { type: string }
+        severity: { $ref: '#/components/schemas/IssueSeverity' }
+        owner: { $ref: '#/components/schemas/UserRef' }
+        rootCause: { type: string }
+        solution: { type: string }
+        status: { $ref: '#/components/schemas/IssueStatus' }
+        dueDate: { type: string, format: date, nullable: true }
+        resolvedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        version: { type: integer }
+    IssuePage:
+      allOf:
+        - { $ref: '#/components/schemas/PageResponse' }
+        - type: object
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/IssueResponse' }
+    # ---------- Milestone ----------
+    MilestoneCreateRequest:
+      type: object
+      required: [projectId, name, plannedDate]
+      properties:
+        projectId: { type: string, format: uuid }
+        name: { type: string, maxLength: 150 }
+        description: { type: string }
+        plannedDate: { type: string, format: date }
+        note: { type: string }
+    MilestoneUpdateRequest:
+      allOf:
+        - { $ref: '#/components/schemas/MilestoneCreateRequest' }
+        - type: object
+          required: [version]
+          properties:
+            status: { $ref: '#/components/schemas/MilestoneStatus' }
+            progress: { type: integer, minimum: 0, maximum: 100 }
+            actualDate: { type: string, format: date, nullable: true }
+            version: { type: integer }
+    MilestoneResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        projectCode: { type: string }
+        projectName: { type: string }
+        name: { type: string }
+        description: { type: string }
+        plannedDate: { type: string, format: date }
+        actualDate: { type: string, format: date, nullable: true }
+        status: { $ref: '#/components/schemas/MilestoneStatus' }
+        progress: { type: integer }
+        note: { type: string }
+        createdAt: { type: string, format: date-time }
+        version: { type: integer }
+    MilestonePage:
+      allOf:
+        - { $ref: '#/components/schemas/PageResponse' }
+        - type: object
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/MilestoneResponse' }
+    # ---------- Notification ----------
+    NotificationResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        type: { $ref: '#/components/schemas/NotificationType' }
+        title: { type: string }
+        content: { type: string }
+        entityType: { type: string }
+        entityId: { type: string, format: uuid, nullable: true }
+        isRead: { type: boolean }
+        readAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+    NotificationPage:
+      allOf:
+        - { $ref: '#/components/schemas/PageResponse' }
+        - type: object
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/NotificationResponse' }
+    # ---------- Report & Audit ----------
+    StatusCountItems:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              status: { $ref: '#/components/schemas/TaskStatus' }
+              count: { type: integer }
+    AssigneeCountItems:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              assigneeId: { type: string, format: uuid }
+              fullName: { type: string }
+              count: { type: integer }
+              doneCount: { type: integer }
+    ProjectProgressReportResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              projectId: { type: string, format: uuid }
+              code: { type: string }
+              name: { type: string }
+              progress: { type: integer }
+              totalTasks: { type: integer }
+              doneTasks: { type: integer }
+    RiskIssueSummaryResponse:
+      type: object
+      properties:
+        openRisks: { type: integer }
+        openIssues: { type: integer }
+        risksByLevel:
+          type: array
+          items:
+            type: object
+            properties:
+              level: { $ref: '#/components/schemas/RiskLevel' }
+              count: { type: integer }
+        issuesBySeverity:
+          type: array
+          items:
+            type: object
+            properties:
+              severity: { $ref: '#/components/schemas/IssueSeverity' }
+              count: { type: integer }
+    AuditLogResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        traceId: { type: string }
+        actorId: { type: string, format: uuid, nullable: true }
+        actorUsername: { type: string }
+        action: { type: string }
+        entityType: { type: string }
+        entityId: { type: string, format: uuid, nullable: true }
+        beforeData:
+          type: object
+          additionalProperties: true
+        afterData:
+          type: object
+          additionalProperties: true
+        createdAt: { type: string, format: date-time }
+    AuditLogPage:
+      allOf:
+        - { $ref: '#/components/schemas/PageResponse' }
+        - type: object
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/AuditLogResponse' }

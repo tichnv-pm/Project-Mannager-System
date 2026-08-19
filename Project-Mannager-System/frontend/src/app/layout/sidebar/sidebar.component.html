@@ -1,0 +1,97 @@
+<aside class="sidebar" [class.collapsed]="collapsed">
+  <div class="sidebar-header">
+    <div class="logo">
+      <span class="logo-icon">PM</span>
+      <span *ngIf="!collapsed" class="logo-text">PM Daily</span>
+    </div>
+  </div>
+
+  <div *ngIf="!collapsed && user" class="user-card">
+    <div class="avatar">{{ user.fullName ? user.fullName[0].toUpperCase() : 'U' }}</div>
+    <div class="user-info">
+      <span class="user-name">{{ user.fullName || user.username }}</span>
+      <span class="role-badge">{{ userRoleLabel }}</span>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <ul>
+      <li>
+        <a routerLink="/dashboard" routerLinkActive="active" class="nav-item">
+          <span class="nav-icon">📊</span>
+          <span *ngIf="!collapsed" class="nav-text">Dashboard</span>
+        </a>
+      </li>
+
+      <li *hasPermission="'project:view'">
+        <a routerLink="/projects" routerLinkActive="active" class="nav-item">
+          <span class="nav-icon">📁</span>
+          <span *ngIf="!collapsed" class="nav-text">Dự án</span>
+        </a>
+      </li>
+
+      <li *hasPermission="'task:view'">
+        <a routerLink="/tasks" routerLinkActive="active" class="nav-item">
+          <span class="nav-icon">✅</span>
+          <span *ngIf="!collapsed" class="nav-text">Công việc</span>
+        </a>
+      </li>
+
+      <li *hasPermission="'meeting:view'">
+        <a routerLink="/meetings" routerLinkActive="active" class="nav-item">
+          <span class="nav-icon">🤝</span>
+          <span *ngIf="!collapsed" class="nav-text">Cuộc họp</span>
+        </a>
+      </li>
+
+      <li>
+        <a routerLink="/risks-issues" routerLinkActive="active" class="nav-item">
+          <span class="nav-icon">⚠️</span>
+          <span *ngIf="!collapsed" class="nav-text">Risk & Issue</span>
+        </a>
+      </li>
+
+      <li *hasPermission="'milestone:view'">
+        <a routerLink="/milestones" routerLinkActive="active" class="nav-item">
+          <span class="nav-icon">🎯</span>
+          <span *ngIf="!collapsed" class="nav-text">Milestone</span>
+        </a>
+      </li>
+
+      <li *hasPermission="'plan:view'">
+        <a routerLink="/plans" routerLinkActive="active" class="nav-item">
+          <span class="nav-icon">🗓️</span>
+          <span *ngIf="!collapsed" class="nav-text">Kế hoạch</span>
+        </a>
+      </li>
+
+      <li *hasPermission="'plan:view'">
+        <a routerLink="/plans/templates" routerLinkActive="active" class="nav-item">
+          <span class="nav-icon">🧩</span>
+          <span *ngIf="!collapsed" class="nav-text">Template</span>
+        </a>
+      </li>
+
+      <li *hasPermission="'plan:view'">
+        <a routerLink="/portfolio" routerLinkActive="active" class="nav-item">
+          <span class="nav-icon">🏢</span>
+          <span *ngIf="!collapsed" class="nav-text">Portfolio</span>
+        </a>
+      </li>
+
+      <li *hasPermission="'report:view'">
+        <a routerLink="/reports" routerLinkActive="active" class="nav-item">
+          <span class="nav-icon">📈</span>
+          <span *ngIf="!collapsed" class="nav-text">Báo cáo</span>
+        </a>
+      </li>
+
+      <li *hasPermission="'audit:view'">
+        <a routerLink="/admin" routerLinkActive="active" class="nav-item">
+          <span class="nav-icon">⚙️</span>
+          <span *ngIf="!collapsed" class="nav-text">Quản trị</span>
+        </a>
+      </li>
+    </ul>
+  </nav>
+</aside>

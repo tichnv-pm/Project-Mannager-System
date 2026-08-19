@@ -1,0 +1,307 @@
+<div class="risk-issue-page">
+  <app-page-header title="Quản lý Rủi ro & Vấn đề" subtitle="Theo dõi Rủi ro (Risk), Ma trận Level, Vấn đề phát sinh (Issue) và phương án xử lý">
+    <div class="header-actions">
+      <button *ngIf="activeTab === 'risks'" (click)="openCreateRiskModal()" class="btn-primary">
+        ⚠️ Khai báo Rủi ro mới
+      </button>
+      <button *ngIf="activeTab === 'issues'" (click)="openCreateIssueModal()" class="btn-primary">
+        🐛 Ghị nhận Vấn đề mới
+      </button>
+    </div>
+  </app-page-header>
+
+  <!-- Tabs Switcher -->
+  <div class="tabs-header">
+    <button class="tab-btn" [class.active]="activeTab === 'risks'" (click)="switchTab('risks')">
+      ⚠️ Quản lý Rủi ro (Risks)
+    </button>
+    <button class="tab-btn" [class.active]="activeTab === 'issues'" (click)="switchTab('issues')">
+      🐛 Quản lý Vấn đề (Issues)
+    </button>
+  </div>
+
+  <!-- Filter Toolbar -->
+  <div class="filter-toolbar">
+    <div class="search-box">
+      <span class="icon">🔍</span>
+      <input
+        type="text"
+        [(ngModel)]="keyword"
+        (keyup.enter)="onFilter()"
+        placeholder="Tìm kiếm tiêu đề, mã..."
+        class="form-control"
+      />
+    </div>
+
+    <div class="filter-group">
+      <select [(ngModel)]="selectedProjectId" (change)="onFilter()" class="form-control">
+        <option value="">-- Tất cả dự án --</option>
+        <option *ngFor="let p of projectsList()" [value]="p.id">[{{ p.code }}] {{ p.name }}</option>
+      </select>
+    </div>
+
+    <div *ngIf="activeTab === 'risks'" class="filter-group">
+      <select [(ngModel)]="selectedLevel" (change)="onFilter()" class="form-control">
+        <option value="">-- Mức Rủi ro (Level) --</option>
+        <option value="LOW">Thấp (LOW)</option>
+        <option value="MEDIUM">Trung bình (MEDIUM)</option>
+        <option value="HIGH">Cao (HIGH)</option>
+        <option value="CRITICAL">Nghiêm trọng (CRITICAL)</option>
+      </select>
+    </div>
+
+    <div *ngIf="activeTab === 'issues'" class="filter-group">
+      <select [(ngModel)]="selectedLevel" (change)="onFilter()" class="form-control">
+        <option value="">-- Mức độ nghiêm trọng --</option>
+        <option value="LOW">Thấp (LOW)</option>
+        <option value="MEDIUM">Trung bình (MEDIUM)</option>
+        <option value="HIGH">Cao (HIGH)</option>
+        <option value="CRITICAL">Nghiêm trọng (CRITICAL)</option>
+      </select>
+    </div>
+
+    <button (click)="onFilter()" class="btn-secondary">Tìm kiếm</button>
+    <button *ngIf="keyword || selectedProjectId || selectedStatus || selectedLevel" (click)="resetFilter()" class="btn-text">Xóa bộ lọc</button>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading()" class="loading-state">
+    <div class="spinner"></div>
+    <p>Đang tải dữ liệu {{ activeTab === 'risks' ? 'Rủi ro' : 'Vấn đề' }}...</p>
+  </div>
+
+  <!-- TAB 1: RISKS MANAGEMENT -->
+  <div *ngIf="!loading() && activeTab === 'risks'">
+    <app-empty-state
+      *ngIf="risks().length === 0"
+      title="Chưa có Rủi ro nào"
+      description="Tạo mới rủi ro để đánh giá xác suất & mức độ ảnh hưởng đến dự án."
+    >
+      <button (click)="openCreateRiskModal()" class="btn-primary">Khai báo Rủi ro</button>
+    </app-empty-state>
+
+    <div *ngIf="risks().length > 0" class="cards-grid">
+      <div *ngFor="let r of risks()" class="item-card" [class.card-danger]="r.level === 'HIGH' || r.level === 'CRITICAL'">
+        <div class="card-top">
+          <span class="code-badge">{{ r.code }}</span>
+          <app-priority-chip [priority]="r.level"></app-priority-chip>
+          <app-status-chip [status]="r.status"></app-status-chip>
+        </div>
+
+        <h3 class="item-title">{{ r.title }}</h3>
+        <p *ngIf="r.description" class="item-desc">{{ r.description }}</p>
+
+        <div class="matrix-info">
+          <span>Xác suất: <strong>{{ r.probability }}</strong></span>
+          <span>Ảnh hưởng: <strong>{{ r.impact }}</strong></span>
+          <span>Chịu trách nhiệm: <strong>{{ r.owner?.fullName }}</strong></span>
+        </div>
+
+        <div *ngIf="r.mitigationPlan" class="plan-box">
+          <strong>🛡️ Kế hoạch giảm thiểu:</strong>
+          <p>{{ r.mitigationPlan }}</p>
+        </div>
+
+        <div class="card-actions">
+          <button *ngIf="r.status === 'OCCURRED' && !r.linkedIssueId" (click)="convertToIssue(r)" class="btn-action btn-convert">
+            🚨 Chuyển thành Issue
+          </button>
+          <button (click)="openEditRiskModal(r)" class="btn-action btn-edit">Sửa</button>
+          <button (click)="deleteRisk(r)" class="btn-action btn-delete">Xóa</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: ISSUES MANAGEMENT -->
+  <div *ngIf="!loading() && activeTab === 'issues'">
+    <app-empty-state
+      *ngIf="issues().length === 0"
+      title="Chưa có Vấn đề (Issue) nào"
+      description="Tạo mới vấn đề phát sinh để theo dõi nguyên nhân & giải pháp xử lý."
+    >
+      <button (click)="openCreateIssueModal()" class="btn-primary">Ghi nhận Vấn đề</button>
+    </app-empty-state>
+
+    <div *ngIf="issues().length > 0" class="cards-grid">
+      <div *ngFor="let i of issues()" class="item-card" [class.card-danger]="i.severity === 'CRITICAL'">
+        <div class="card-top">
+          <span class="code-badge issue-badge">{{ i.code }}</span>
+          <app-priority-chip [priority]="i.severity"></app-priority-chip>
+          <app-status-chip [status]="i.status"></app-status-chip>
+        </div>
+
+        <h3 class="item-title">{{ i.title }}</h3>
+        <p *ngIf="i.description" class="item-desc">{{ i.description }}</p>
+
+        <div class="matrix-info">
+          <span>Chịu trách nhiệm: <strong>{{ i.owner?.fullName }}</strong></span>
+          <span *ngIf="i.resolvedAt">Ngày giải quyết: <strong>{{ i.resolvedAt | date:'dd/MM/yyyy' }}</strong></span>
+        </div>
+
+        <div *ngIf="i.rootCause" class="plan-box">
+          <strong>🔍 Nguyên nhân gốc rễ:</strong>
+          <p>{{ i.rootCause }}</p>
+        </div>
+
+        <div *ngIf="i.solution" class="plan-box solution-box">
+          <strong>✅ Giải pháp khắc phục:</strong>
+          <p>{{ i.solution }}</p>
+        </div>
+
+        <div class="card-actions">
+          <button *ngIf="i.status !== 'RESOLVED' && i.status !== 'CLOSED'" (click)="resolveIssue(i)" class="btn-action btn-resolve">
+            ✔ Đánh dấu Giải quyết
+          </button>
+          <button (click)="openEditIssueModal(i)" class="btn-action btn-edit">Sửa</button>
+          <button (click)="deleteIssue(i)" class="btn-action btn-delete">Xóa</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create / Edit Risk Modal -->
+  <div *ngIf="showRiskModal()" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>{{ isEditRisk() ? 'Cập nhật Rủi ro (Risk)' : 'Khai báo Rủi ro Mới' }}</h3>
+        <button (click)="showRiskModal.set(false)" class="close-btn">✕</button>
+      </div>
+
+      <div *ngIf="formError()" class="alert alert-danger">⚠️ {{ formError() }}</div>
+
+      <form [formGroup]="riskForm" (ngSubmit)="saveRisk()" class="modal-body">
+        <div class="form-group">
+          <label>Dự án <span class="req">*</span></label>
+          <select formControlName="projectId" class="form-control">
+            <option value="">-- Chọn dự án --</option>
+            <option *ngFor="let p of projectsList()" [value]="p.id">[{{ p.code }}] {{ p.name }}</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Tiêu đề rủi ro <span class="req">*</span></label>
+          <input type="text" formControlName="title" placeholder="VD: Nguy cơ chậm tiến độ do thiếu nhân sự Mobile" class="form-control" />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col">
+            <label>Xác suất (Probability) <span class="req">*</span></label>
+            <select formControlName="probability" class="form-control">
+              <option value="LOW">Thấp (LOW)</option>
+              <option value="MEDIUM">Trung bình (MEDIUM)</option>
+              <option value="HIGH">Cao (HIGH)</option>
+            </select>
+          </div>
+
+          <div class="form-group col">
+            <label>Tác động (Impact) <span class="req">*</span></label>
+            <select formControlName="impact" class="form-control">
+              <option value="LOW">Thấp (LOW)</option>
+              <option value="MEDIUM">Trung bình (MEDIUM)</option>
+              <option value="HIGH">Cao (HIGH)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col">
+            <label>Người theo dõi chính <span class="req">*</span></label>
+            <select formControlName="ownerId" class="form-control">
+              <option value="">-- Chọn người chịu trách nhiệm --</option>
+              <option *ngFor="let u of usersList()" [value]="u.id">{{ u.fullName || u.username }}</option>
+            </select>
+          </div>
+
+          <div class="form-group col">
+            <label>Trạng thái</label>
+            <select formControlName="status" class="form-control">
+              <option value="OPEN">Mới nhận diện (OPEN)</option>
+              <option value="MONITORING">Đang theo dõi (MONITORING)</option>
+              <option value="OCCURRED">Đã xảy ra (OCCURRED)</option>
+              <option value="RESOLVED">Đã giải quyết (RESOLVED)</option>
+              <option value="CLOSED">Đã đóng (CLOSED)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Kế hoạch giảm thiểu (Mitigation Plan)</label>
+          <textarea formControlName="mitigationPlan" rows="2" placeholder="Biện pháp phòng ngừa..." class="form-control"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Kế hoạch dự phòng (Contingency Plan)</label>
+          <textarea formControlName="contingencyPlan" rows="2" placeholder="Phương án nếu rủi ro xảy ra..." class="form-control"></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" (click)="showRiskModal.set(false)" class="btn-secondary">Hủy</button>
+          <button type="submit" class="btn-primary" [disabled]="formSubmitting()">Lưu thông tin</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Create / Edit Issue Modal -->
+  <div *ngIf="showIssueModal()" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>{{ isEditIssue() ? 'Cập nhật Vấn đề (Issue)' : 'Ghi nhận Vấn đề Mới' }}</h3>
+        <button (click)="showIssueModal.set(false)" class="close-btn">✕</button>
+      </div>
+
+      <div *ngIf="formError()" class="alert alert-danger">⚠️ {{ formError() }}</div>
+
+      <form [formGroup]="issueForm" (ngSubmit)="saveIssue()" class="modal-body">
+        <div class="form-group">
+          <label>Dự án <span class="req">*</span></label>
+          <select formControlName="projectId" class="form-control">
+            <option value="">-- Chọn dự án --</option>
+            <option *ngFor="let p of projectsList()" [value]="p.id">[{{ p.code }}] {{ p.name }}</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Tiêu đề vấn đề <span class="req">*</span></label>
+          <input type="text" formControlName="title" placeholder="VD: Server staging bị quá tải sập dịch vụ" class="form-control" />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col">
+            <label>Mức độ nghiêm trọng <span class="req">*</span></label>
+            <select formControlName="severity" class="form-control">
+              <option value="LOW">Thấp (LOW)</option>
+              <option value="MEDIUM">Trung bình (MEDIUM)</option>
+              <option value="HIGH">Cao (HIGH)</option>
+              <option value="CRITICAL">Nghiêm trọng (CRITICAL)</option>
+            </select>
+          </div>
+
+          <div class="form-group col">
+            <label>Người chịu trách nhiệm <span class="req">*</span></label>
+            <select formControlName="ownerId" class="form-control">
+              <option value="">-- Chọn người xử lý --</option>
+              <option *ngFor="let u of usersList()" [value]="u.id">{{ u.fullName || u.username }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Nguyên nhân gốc rễ (Root Cause)</label>
+          <textarea formControlName="rootCause" rows="2" placeholder="Lý do dẫn đến vấn đề..." class="form-control"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Giải pháp xử lý (Solution)</label>
+          <textarea formControlName="solution" rows="2" placeholder="Phương án giải quyết..." class="form-control"></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" (click)="showIssueModal.set(false)" class="btn-secondary">Hủy</button>
+          <button type="submit" class="btn-primary" [disabled]="formSubmitting()">Lưu thông tin</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

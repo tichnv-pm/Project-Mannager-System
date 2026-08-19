@@ -1,0 +1,151 @@
+<div class="milestones-page">
+  <app-page-header title="Quản lý Milestone Dự án" subtitle="Quản lý mốc tiến độ dự án, ngày kế hoạch vs ngày thực tế và % tiến độ">
+    <button *hasPermission="'milestone:manage'" (click)="openCreateModal()" class="btn-primary">
+      🎯 Tạo Milestone Mới
+    </button>
+  </app-page-header>
+
+  <!-- Filter Toolbar -->
+  <div class="filter-toolbar">
+    <div class="filter-group">
+      <select [(ngModel)]="selectedProjectId" (change)="onFilter()" class="form-control">
+        <option value="">-- Tất cả dự án --</option>
+        <option *ngFor="let p of projectsList()" [value]="p.id">[{{ p.code }}] {{ p.name }}</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <select [(ngModel)]="selectedStatus" (change)="onFilter()" class="form-control">
+        <option value="">-- Trạng thái --</option>
+        <option value="NOT_STARTED">Chưa bắt đầu (NOT_STARTED)</option>
+        <option value="IN_PROGRESS">Đang thực hiện (IN_PROGRESS)</option>
+        <option value="COMPLETED">Hoàn tất (COMPLETED)</option>
+        <option value="DELAYED">Trễ hạn (DELAYED)</option>
+        <option value="CANCELLED">Hủy (CANCELLED)</option>
+      </select>
+    </div>
+
+    <button (click)="onFilter()" class="btn-secondary">Tìm kiếm</button>
+    <button *ngIf="selectedProjectId || selectedStatus" (click)="resetFilter()" class="btn-text">Xóa bộ lọc</button>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading()" class="loading-state">
+    <div class="spinner"></div>
+    <p>Đang tải danh sách Milestone...</p>
+  </div>
+
+  <!-- Empty State -->
+  <app-empty-state
+    *ngIf="!loading() && milestones().length === 0"
+    title="Chưa có Milestone nào"
+    description="Tạo mới các mốc tiến độ chính để kiểm soát tiến độ dự án theo kế hoạch."
+  >
+    <button *hasPermission="'milestone:manage'" (click)="openCreateModal()" class="btn-primary">
+      Tạo Milestone đầu tiên
+    </button>
+  </app-empty-state>
+
+  <!-- Milestones Cards Grid -->
+  <div *ngIf="!loading() && milestones().length > 0" class="milestones-grid">
+    <div *ngFor="let m of milestones()" class="milestone-card" [class.card-completed]="m.status === 'COMPLETED'">
+      <div class="card-top">
+        <span class="prj-code">[{{ m.projectCode }}] {{ m.projectName }}</span>
+        <app-status-chip [status]="m.status"></app-status-chip>
+      </div>
+
+      <h3 class="m-name">{{ m.name }}</h3>
+      <p *ngIf="m.description" class="m-desc">{{ m.description }}</p>
+
+      <div class="progress-section">
+        <div class="p-header">
+          <span>Tiến độ mốc</span>
+          <span class="p-val">{{ m.progress }}%</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" [style.width.%]="m.progress"></div>
+        </div>
+      </div>
+
+      <div class="dates-meta">
+        <div>📅 Kế hoạch: <strong>{{ m.plannedDate }}</strong></div>
+        <div *ngIf="m.actualDate">✔ Thực tế: <strong>{{ m.actualDate }}</strong></div>
+      </div>
+
+      <div class="card-actions">
+        <button *ngIf="m.status !== 'COMPLETED'" (click)="completeMilestone(m)" class="btn-action btn-complete">
+          ✔ Hoàn thành (100%)
+        </button>
+        <button *hasPermission="'milestone:manage'" (click)="openEditModal(m)" class="btn-action btn-edit">Sửa</button>
+        <button *hasPermission="'milestone:manage'" (click)="deleteMilestone(m)" class="btn-action btn-delete">Xóa</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create / Edit Milestone Modal -->
+  <div *ngIf="showModal()" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>{{ isEditMode() ? 'Cập nhật Milestone' : 'Tạo mới Milestone' }}</h3>
+        <button (click)="closeModal()" class="close-btn">✕</button>
+      </div>
+
+      <div *ngIf="formError()" class="alert alert-danger">⚠️ {{ formError() }}</div>
+
+      <form [formGroup]="milestoneForm" (ngSubmit)="saveMilestone()" class="modal-body">
+        <div class="form-group">
+          <label>Dự án <span class="req">*</span></label>
+          <select formControlName="projectId" class="form-control">
+            <option value="">-- Chọn dự án --</option>
+            <option *ngFor="let p of projectsList()" [value]="p.id">[{{ p.code }}] {{ p.name }}</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Tên cột mốc (Milestone Name) <span class="req">*</span></label>
+          <input type="text" formControlName="name" placeholder="VD: Release v1.0 Production" class="form-control" />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col">
+            <label>Ngày kế hoạch (Planned Date) <span class="req">*</span></label>
+            <input type="date" formControlName="plannedDate" class="form-control" />
+          </div>
+
+          <div *ngIf="isEditMode()" class="form-group col">
+            <label>Ngày thực tế (Actual Date)</label>
+            <input type="date" formControlName="actualDate" class="form-control" />
+          </div>
+        </div>
+
+        <div *ngIf="isEditMode()" class="form-row">
+          <div class="form-group col">
+            <label>Trạng thái</label>
+            <select formControlName="status" class="form-control">
+              <option value="NOT_STARTED">Chưa bắt đầu</option>
+              <option value="IN_PROGRESS">Đang thực hiện</option>
+              <option value="COMPLETED">Hoàn tất (COMPLETED)</option>
+              <option value="DELAYED">Trễ hạn (DELAYED)</option>
+              <option value="CANCELLED">Hủy (CANCELLED)</option>
+            </select>
+          </div>
+
+          <div class="form-group col">
+            <label>Tiến độ %</label>
+            <input type="number" min="0" max="100" formControlName="progress" class="form-control" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Mô tả chi tiết</label>
+          <textarea formControlName="description" rows="3" placeholder="Mục tiêu cột mốc..." class="form-control"></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" (click)="closeModal()" class="btn-secondary">Hủy</button>
+          <button type="submit" class="btn-primary" [disabled]="formSubmitting()">Lưu thông tin</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

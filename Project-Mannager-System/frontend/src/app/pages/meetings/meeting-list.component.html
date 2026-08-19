@@ -1,0 +1,517 @@
+<div class="meetings-page">
+  <app-page-header
+    title="Quản lý Cuộc họp & Lịch họp"
+    subtitle="Lên lịch họp, ghi biên bản (Minutes), theo dõi Action Items và kết luận"
+  >
+    <div class="header-actions">
+      <button *hasPermission="'meeting:manage'" (click)="openCreateModal()" class="btn-primary" id="btn-create-meeting">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Lên lịch họp mới
+      </button>
+    </div>
+  </app-page-header>
+
+  <!-- Quick Filter Pills -->
+  <div class="quick-filters">
+    <button id="qf-all"       [class.active]="quickFilter() === 'all'"       (click)="setQuickFilter('all')"       class="chip-filter">📋 Tất cả</button>
+    <button id="qf-today"     [class.active]="quickFilter() === 'today'"     (click)="setQuickFilter('today')"     class="chip-filter accent">📅 Hôm nay</button>
+    <button id="qf-upcoming"  [class.active]="quickFilter() === 'upcoming'"  (click)="setQuickFilter('upcoming')"  class="chip-filter">🗓️ Sắp diễn ra</button>
+    <button id="qf-completed" [class.active]="quickFilter() === 'completed'" (click)="setQuickFilter('completed')" class="chip-filter">✅ Đã hoàn thành</button>
+  </div>
+
+  <!-- Filter Toolbar -->
+  <div class="filter-toolbar">
+    <div class="search-box">
+      <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="meeting-search" type="text" [(ngModel)]="keyword" (ngModelChange)="onKeywordChange()"
+        placeholder="Tìm kiếm tiêu đề cuộc họp..." class="form-control search-input" />
+    </div>
+
+    <div class="filter-group">
+      <label class="filter-label">Dự án</label>
+      <select id="filter-project" [(ngModel)]="selectedProjectId" (change)="onFilter()" class="form-control">
+        <option value="">Tất cả dự án</option>
+        <option *ngFor="let p of projectsList()" [value]="p.id">[{{ p.code }}] {{ p.name }}</option>
+      </select>
+    </div>
+
+    <div class="filter-group" *ngIf="quickFilter() === 'all'">
+      <label class="filter-label">Trạng thái</label>
+      <select id="filter-status" [(ngModel)]="selectedStatus" (change)="onFilter()" class="form-control">
+        <option value="">Tất cả</option>
+        <option value="SCHEDULED">📅 Đã lên lịch</option>
+        <option value="IN_PROGRESS">▶️ Đang diễn ra</option>
+        <option value="COMPLETED">✅ Đã hoàn thành</option>
+        <option value="CANCELLED">❌ Đã hủy</option>
+      </select>
+    </div>
+
+    <div class="filter-group date-group">
+      <label class="filter-label">Từ ngày</label>
+      <input type="datetime-local" id="filter-from-time" [(ngModel)]="fromTime" (change)="onFilter()" class="form-control" />
+    </div>
+
+    <div class="filter-group date-group">
+      <label class="filter-label">Đến ngày</label>
+      <input type="datetime-local" id="filter-to-time" [(ngModel)]="toTime" (change)="onFilter()" class="form-control" />
+    </div>
+
+    <button *ngIf="hasActiveFilters()" (click)="resetFilter()" class="btn-reset" id="btn-reset-filter">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      Xóa bộ lọc
+    </button>
+  </div>
+
+  <!-- Result Summary -->
+  <div class="result-summary" *ngIf="!loading()">
+    <span class="count-badge">{{ totalElements() }} cuộc họp</span>
+  </div>
+
+  <!-- Loading -->
+  <div *ngIf="loading()" class="loading-state">
+    <div class="spinner"></div>
+    <p>Đang tải danh sách cuộc họp...</p>
+  </div>
+
+  <!-- Error -->
+  <div *ngIf="error() && !loading()" class="error-state">
+    <p>⚠️ {{ error() }}</p>
+    <button (click)="loadMeetings()" class="btn-secondary">Thử lại</button>
+  </div>
+
+  <!-- Empty -->
+  <app-empty-state
+    *ngIf="!loading() && !error() && meetings().length === 0"
+    title="Không tìm thấy cuộc họp nào"
+    description="Thử thay đổi bộ lọc hoặc lên lịch một cuộc họp mới."
+  >
+    <button *hasPermission="'meeting:manage'" (click)="openCreateModal()" class="btn-primary">Lên lịch cuộc họp</button>
+  </app-empty-state>
+
+  <!-- ═══ Meeting Cards Grid ═══ -->
+  <div *ngIf="!loading() && !error() && meetings().length > 0" class="meetings-grid" id="meetings-grid">
+    <div *ngFor="let m of meetings()" class="meeting-card"
+      [class.card-today]="isToday(m.startTime)"
+      [class.card-completed]="m.status === 'COMPLETED'"
+      [class.card-cancelled]="m.status === 'CANCELLED'"
+    >
+      <!-- Card Header -->
+      <div class="card-header-row">
+        <div class="card-badges">
+          <span class="prj-badge">[{{ m.projectCode }}] {{ m.projectName }}</span>
+          <span class="today-badge" *ngIf="isToday(m.startTime)">🔥 Hôm nay</span>
+        </div>
+        <app-status-chip [status]="m.status"></app-status-chip>
+      </div>
+
+      <!-- Title -->
+      <h3 class="meeting-title">{{ getStatusIcon(m.status) }} {{ m.title }}</h3>
+
+      <!-- Time Row -->
+      <div class="time-row">
+        <span class="time-range">
+          ⏰ {{ m.startTime | date:'HH:mm dd/MM' }} → {{ m.endTime | date:'HH:mm' }}
+        </span>
+        <span class="duration-badge">{{ getDurationLabel(m.startTime, m.endTime) }}</span>
+      </div>
+
+      <!-- Meta -->
+      <div class="meta-row">
+        <span class="meta-item">👑 {{ m.chairperson?.fullName }}</span>
+        <span *ngIf="m.location" class="meta-item">📍 {{ m.location }}</span>
+        <span *ngIf="m.participantCount > 0" class="meta-item">👥 {{ m.participantCount }} người</span>
+        <a *ngIf="m.meetingLink" [href]="m.meetingLink" target="_blank" class="online-link">🔗 Vào họp</a>
+      </div>
+
+      <!-- Agenda Preview -->
+      <div *ngIf="m.agenda" class="agenda-box">
+        <span class="agenda-label">📋 Chương trình:</span>
+        <p class="agenda-text">{{ m.agenda | slice:0:120 }}{{ (m.agenda?.length ?? 0) > 120 ? '...' : '' }}</p>
+      </div>
+
+      <!-- Conclusion Preview (COMPLETED) -->
+      <div *ngIf="m.status === 'COMPLETED' && m.conclusion" class="conclusion-box">
+        <span class="conclusion-label">🎯 Kết luận:</span>
+        <p class="conclusion-text">{{ m.conclusion | slice:0:120 }}{{ (m.conclusion?.length ?? 0) > 120 ? '...' : '' }}</p>
+      </div>
+
+      <!-- Action Items Toggle -->
+      <div class="ai-toggle-row">
+        <button (click)="toggleActionItems(m.id)" class="btn-ai-toggle" [id]="'toggle-ai-' + m.id">
+          📌 Action Items
+          <span class="ai-count" *ngIf="m.actionItemCount">{{ m.actionItemCount }}</span>
+          <span class="ai-arrow">{{ isActionItemsExpanded(m.id) ? '▲' : '▼' }}</span>
+        </button>
+        <button *hasPermission="'action-item:manage'" (click)="openCreateAIModal(m)"
+          class="btn-ai-add" [id]="'add-ai-' + m.id">＋ Thêm</button>
+      </div>
+
+      <!-- Action Items Expanded -->
+      <div *ngIf="isActionItemsExpanded(m.id)" class="ai-list">
+        <div *ngIf="isActionItemsLoading(m.id)" class="ai-loading">Đang tải...</div>
+        <div *ngIf="!isActionItemsLoading(m.id) && getActionItems(m.id).length === 0" class="ai-empty">
+          Chưa có action item nào
+        </div>
+        <div *ngFor="let ai of getActionItems(m.id)" class="ai-item" [id]="'ai-' + ai.id">
+          <span class="ai-status-dot" [style.background]="getActionItemStatusColor(ai.status)"></span>
+          <div class="ai-info">
+            <span class="ai-title">{{ ai.title }}</span>
+            <span class="ai-meta">
+              {{ ai.assignee?.fullName || '—' }}
+              <span *ngIf="ai.dueDate"> · 📅 {{ ai.dueDate }}</span>
+              <span *ngIf="ai.linkedTaskId" class="linked-badge">🔗 Task</span>
+            </span>
+          </div>
+          <div class="ai-actions">
+            <button *hasPermission="'action-item:manage'"
+              (click)="openEditAIModal(m, ai)" class="btn-mini" [id]="'edit-ai-' + ai.id">✏️</button>
+            <button *hasPermission="'action-item:manage'"
+              (click)="deleteActionItem(m, ai)" class="btn-mini" [id]="'delete-ai-' + ai.id">🗑️</button>
+            <button *hasPermission="'action-item:manage'"
+              (click)="openConvertModal(ai)" [disabled]="!!ai.linkedTaskId"
+              class="btn-mini btn-convert" [id]="'convert-ai-' + ai.id" title="Chuyển thành Task">
+              🔗 Task
+            </button>
+          </div>
+          <span class="ai-status-label">{{ ai.status }}</span>
+        </div>
+      </div>
+
+      <!-- Details Toggle (participants + attachments) -->
+      <div class="detail-toggle-row">
+        <button (click)="toggleDetails(m.id)" class="btn-detail-toggle" [id]="'toggle-details-' + m.id">
+          👥 Người tham gia & 📎 File đính kèm
+          <span class="ai-arrow">{{ isDetailsExpanded(m.id) ? '▲' : '▼' }}</span>
+        </button>
+      </div>
+
+      <!-- Details Expanded -->
+      <div *ngIf="isDetailsExpanded(m.id)" class="detail-panel">
+        <div class="detail-section">
+          <div class="detail-head">
+            <span class="detail-title">👥 Người tham gia</span>
+            <div class="add-participant-row" *hasPermission="'meeting:manage'">
+              <select #newParticipant class="form-control participant-select"
+                [value]="''" (change)="addParticipant(m.id, newParticipant.value); newParticipant.value=''">
+                <option value="">-- Thêm người tham gia --</option>
+                <option *ngFor="let u of usersList()" [value]="u.id"
+                  [disabled]="!canAddParticipant(m.id, u.id)">{{ u.fullName || u.username }}</option>
+              </select>
+            </div>
+          </div>
+          <div *ngIf="isParticipantsLoading(m.id)" class="ai-loading">Đang tải...</div>
+          <div *ngIf="!isParticipantsLoading(m.id) && getParticipants(m.id).length === 0" class="ai-empty">
+            Chưa có người tham gia
+          </div>
+          <div *ngFor="let p of getParticipants(m.id)" class="participant-item" [id]="'participant-' + p.id">
+            <span class="participant-avatar">{{ (p.fullName || '?').charAt(0) }}</span>
+            <span class="participant-name">{{ p.fullName }}</span>
+            <button *hasPermission="'meeting:manage'" (click)="removeParticipant(m.id, p.id)"
+              class="btn-mini" [id]="'remove-participant-' + p.id">✕</button>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-head">
+            <span class="detail-title">📎 File đính kèm</span>
+            <div class="upload-row" *hasPermission="'meeting:manage'">
+              <label class="btn-upload">
+                {{ uploadInProgress() ? 'Đang tải...' : '＋ Upload' }}
+                <input type="file" style="display:none" (change)="uploadAttachment(m.id, $event.target.files?.[0] ?? null); $event.target.value=''" />
+              </label>
+            </div>
+          </div>
+          <div *ngIf="isAttachmentsLoading(m.id)" class="ai-loading">Đang tải...</div>
+          <div *ngIf="!isAttachmentsLoading(m.id) && getAttachments(m.id).length === 0" class="ai-empty">
+            Chưa có file đính kèm
+          </div>
+          <div *ngFor="let att of getAttachments(m.id)" class="attachment-item" [id]="'attachment-' + att.id">
+            <span class="attachment-icon">📄</span>
+            <button class="attachment-name" (click)="downloadAttachment(m.id, att.id)">{{ att.fileName }}</button>
+            <span class="attachment-size">{{ getFileSize(att.sizeBytes) }}</span>
+            <button *hasPermission="'meeting:manage'" (click)="deleteAttachment(m.id, att.id)"
+              class="btn-mini" [id]="'delete-attachment-' + att.id">🗑️</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card Actions -->
+      <div class="card-actions">
+        <button *ngIf="m.status !== 'COMPLETED' && m.status !== 'CANCELLED'"
+          (click)="openCompleteModal(m)" class="btn-complete" [id]="'complete-' + m.id">
+          📝 Ghi biên bản
+        </button>
+        <button *hasPermission="'meeting:manage'" (click)="openEditModal(m)"
+          class="btn-edit" [id]="'edit-meeting-' + m.id">✏️</button>
+        <button *hasPermission="'meeting:manage'" (click)="openDeleteModal(m)"
+          class="btn-del" [id]="'delete-meeting-' + m.id">🗑️</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pagination -->
+  <div *ngIf="!loading() && totalPages() > 1" class="pagination" id="meeting-pagination">
+    <button (click)="goToPage(page - 1)" [disabled]="page === 0" class="page-btn">←</button>
+    <button *ngFor="let p of pages" (click)="goToPage(p)" [class.active]="p === page" class="page-btn" [id]="'page-' + p">{{ p + 1 }}</button>
+    <button (click)="goToPage(page + 1)" [disabled]="page >= totalPages() - 1" class="page-btn">→</button>
+    <span class="page-info">Trang {{ page + 1 }}/{{ totalPages() }}</span>
+  </div>
+
+  <!-- ═══ MODAL: Create / Edit ═══ -->
+  <div *ngIf="showModal()" class="modal-backdrop" (click)="closeModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()" id="meeting-form-modal">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-icon">{{ isEditMode() ? '✏️' : '📅' }}</span>
+          <h3>{{ isEditMode() ? 'Cập nhật Cuộc họp' : 'Lên lịch Cuộc họp Mới' }}</h3>
+        </div>
+        <button (click)="closeModal()" class="close-btn" id="modal-close-meeting">✕</button>
+      </div>
+
+      <div *ngIf="formError()" class="alert alert-danger">⚠️ {{ formError() }}</div>
+
+      <form [formGroup]="meetingForm" (ngSubmit)="saveMeeting()" class="modal-body">
+        <div class="form-row">
+          <div class="form-group flex-2">
+            <label>Dự án <span class="req">*</span></label>
+            <select formControlName="projectId" class="form-control" id="form-meeting-project">
+              <option value="">-- Chọn dự án --</option>
+              <option *ngFor="let p of projectsList()" [value]="p.id">[{{ p.code }}] {{ p.name }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Người chủ trì <span class="req">*</span></label>
+            <select formControlName="chairpersonId" class="form-control" id="form-chairperson">
+              <option value="">-- Chọn người chủ trì --</option>
+              <option *ngFor="let u of usersList()" [value]="u.id">{{ u.fullName || u.username }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Tiêu đề cuộc họp <span class="req">*</span></label>
+          <input type="text" formControlName="title" id="form-meeting-title"
+            placeholder="VD: Họp Daily Standup nhóm FE" class="form-control" />
+          <span *ngIf="meetingForm.get('title')?.invalid && meetingForm.get('title')?.touched" class="invalid">Tiêu đề là bắt buộc</span>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Thời gian bắt đầu <span class="req">*</span></label>
+            <input type="datetime-local" formControlName="startTime" class="form-control" id="form-start-time" />
+          </div>
+          <div class="form-group">
+            <label>Thời gian kết thúc <span class="req">*</span></label>
+            <input type="datetime-local" formControlName="endTime" class="form-control" id="form-end-time" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Địa điểm họp</label>
+            <input type="text" formControlName="location" placeholder="VD: Phòng họp A2" class="form-control" id="form-location" />
+          </div>
+          <div class="form-group">
+            <label>Link họp Online</label>
+            <input type="url" formControlName="meetingLink" placeholder="https://meet.google.com/..." class="form-control" id="form-meeting-link" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Chương trình (Agenda)</label>
+          <textarea formControlName="agenda" rows="3" id="form-agenda"
+            placeholder="1. Điểm tiến độ sprint&#10;2. Thảo luận vấn đề kỹ thuật..." class="form-control"></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" (click)="closeModal()" class="btn-secondary" id="modal-cancel-meeting">Hủy</button>
+          <button type="submit" class="btn-primary" [disabled]="formSubmitting()" id="modal-submit-meeting">
+            <span *ngIf="!formSubmitting()">{{ isEditMode() ? 'Cập nhật' : 'Lên lịch' }}</span>
+            <span *ngIf="formSubmitting()">Đang xử lý...</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ═══ MODAL: Complete / Biên bản ═══ -->
+  <div *ngIf="showCompleteModal()" class="modal-backdrop" (click)="closeCompleteModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()" id="complete-meeting-modal">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-icon">📝</span>
+          <h3>Ghi biên bản & Hoàn thành cuộc họp</h3>
+        </div>
+        <button (click)="closeCompleteModal()" class="close-btn">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="meeting-preview">
+          <span class="preview-title">{{ targetMeeting?.title }}</span>
+          <span class="preview-time">⏰ {{ targetMeeting?.startTime | date:'HH:mm dd/MM/yyyy' }}</span>
+        </div>
+
+        <div *ngIf="completeError()" class="alert alert-danger">⚠️ {{ completeError() }}</div>
+
+        <div class="form-group">
+          <label>Nội dung cuộc họp (Content)</label>
+          <textarea [(ngModel)]="completeContent" rows="4" id="complete-content"
+            placeholder="Tóm tắt các nội dung đã thảo luận trong cuộc họp..." class="form-control"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Kết luận & Quyết định (Conclusion) <span class="req">*</span></label>
+          <textarea [(ngModel)]="completeConclusion" rows="4" id="complete-conclusion"
+            placeholder="Các quyết định chính được thông qua, cam kết và bước tiếp theo..." class="form-control"></textarea>
+          <span class="hint">Bắt buộc nhập để khóa biên bản cuộc họp</span>
+        </div>
+
+        <div class="alert alert-info">
+          🔒 Sau khi xác nhận, cuộc họp sẽ chuyển sang trạng thái <strong>COMPLETED</strong> và biên bản được khóa.
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button (click)="closeCompleteModal()" class="btn-secondary" id="complete-cancel">Hủy</button>
+        <button (click)="submitComplete()" class="btn-complete-confirm" [disabled]="completeSubmitting()" id="complete-confirm">
+          <span *ngIf="!completeSubmitting()">✅ Hoàn thành & Khóa biên bản</span>
+          <span *ngIf="completeSubmitting()">Đang xử lý...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ MODAL: Action Item (create/edit) ═══ -->
+  <div *ngIf="showAIModal()" class="modal-backdrop" (click)="closeAIModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()" id="action-item-modal">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-icon">📌</span>
+          <h3>{{ isEditAIMode() ? 'Cập nhật Action Item' : 'Thêm Action Item' }}</h3>
+        </div>
+        <button (click)="closeAIModal()" class="close-btn">✕</button>
+      </div>
+
+      <div *ngIf="aiFormError()" class="alert alert-danger">⚠️ {{ aiFormError() }}</div>
+
+      <form [formGroup]="aiForm" (ngSubmit)="saveActionItem()" class="modal-body">
+        <div class="meeting-preview">
+          <span class="preview-title">{{ aiModalMeeting?.title }}</span>
+        </div>
+
+        <div class="form-group">
+          <label>Tiêu đề Action Item <span class="req">*</span></label>
+          <input type="text" formControlName="title" id="ai-title"
+            placeholder="VD: Gửi biên bản cho khách hàng trước 17h" class="form-control" />
+          <span *ngIf="aiForm.get('title')?.invalid && aiForm.get('title')?.touched" class="invalid">Tiêu đề là bắt buộc</span>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-2">
+            <label>Người phụ trách <span class="req">*</span></label>
+            <select formControlName="assigneeId" class="form-control" id="ai-assignee">
+              <option value="">-- Chọn người phụ trách --</option>
+              <option *ngFor="let u of usersList()" [value]="u.id">{{ u.fullName || u.username }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Hạn hoàn thành</label>
+            <input type="date" formControlName="dueDate" class="form-control" id="ai-due-date" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Ưu tiên</label>
+          <select formControlName="priority" class="form-control" id="ai-priority">
+            <option value="LOW">🔵 Thấp</option>
+            <option value="MEDIUM">🟡 Trung bình</option>
+            <option value="HIGH">🟠 Cao</option>
+            <option value="URGENT">🔴 Khẩn cấp</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Mô tả chi tiết</label>
+          <textarea formControlName="description" rows="3" id="ai-description"
+            placeholder="Chi tiết việc cần làm..." class="form-control"></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" (click)="closeAIModal()" class="btn-secondary">Hủy</button>
+          <button type="submit" class="btn-primary" [disabled]="aiSubmitting()" id="ai-submit">
+            <span *ngIf="!aiSubmitting()">{{ isEditAIMode() ? 'Cập nhật' : 'Thêm mới' }}</span>
+            <span *ngIf="aiSubmitting()">Đang xử lý...</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ═══ MODAL: Convert Action Item → Task ═══ -->
+  <div *ngIf="showConvertModal()" class="modal-backdrop" (click)="closeConvertModal()">
+    <div class="modal-card modal-sm" (click)="$event.stopPropagation()" id="convert-ai-modal">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-icon">🔗</span>
+          <h3>Chuyển Action Item thành Task</h3>
+        </div>
+        <button (click)="closeConvertModal()" class="close-btn">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div *ngIf="convertError()" class="alert alert-danger">⚠️ {{ convertError() }}</div>
+        <p class="convert-note">Action item <strong>{{ convertTarget?.title }}</strong> sẽ được tạo thành Task với
+          người thực hiện và nội dung kế thừa. Không thể chuyển lại sau khi hoàn tất.</p>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Hạn hoàn thành</label>
+            <input type="date" [(ngModel)]="convertDueDate" class="form-control" id="convert-due-date" />
+          </div>
+          <div class="form-group">
+            <label>Ưu tiên</label>
+            <select [(ngModel)]="convertPriority" class="form-control" id="convert-priority">
+              <option value="LOW">🔵 Thấp</option>
+              <option value="MEDIUM">🟡 Trung bình</option>
+              <option value="HIGH">🟠 Cao</option>
+              <option value="URGENT">🔴 Khẩn cấp</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button (click)="closeConvertModal()" class="btn-secondary" id="convert-cancel">Hủy</button>
+        <button (click)="confirmConvert()" class="btn-complete-confirm" [disabled]="convertSubmitting()" id="convert-confirm">
+          <span *ngIf="!convertSubmitting()">🔗 Chuyển thành Task</span>
+          <span *ngIf="convertSubmitting()">Đang chuyển...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ MODAL: Delete ═══ -->
+  <div *ngIf="showDeleteModal()" class="modal-backdrop" (click)="closeDeleteModal()">
+    <div class="modal-card modal-sm" (click)="$event.stopPropagation()" id="delete-meeting-modal">
+      <div class="modal-header">
+        <h3>🗑️ Xóa Cuộc họp</h3>
+        <button (click)="closeDeleteModal()" class="close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="delete-box">
+          <div class="delete-icon">⚠️</div>
+          <p>Xác nhận xóa cuộc họp:</p>
+          <strong>{{ deletingMeeting?.title }}</strong>
+          <p class="delete-note">Action Items liên quan sẽ được giữ lại nhưng không còn liên kết với cuộc họp này.</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button (click)="closeDeleteModal()" class="btn-secondary" id="delete-meeting-cancel">Hủy</button>
+        <button (click)="confirmDelete()" class="btn-danger" [disabled]="deleteSubmitting()" id="delete-meeting-confirm">
+          <span *ngIf="!deleteSubmitting()">Xóa</span>
+          <span *ngIf="deleteSubmitting()">Đang xóa...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,363 @@
+.finance-container {
+  padding: 1.5rem;
+}
+
+.loading-state, .error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  text-align: center;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #a855f7;
+  border-radius: 50%;
+  animation: spin 1s infinite linear;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.finance-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.finance-header h4 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.evm-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.evm-card {
+  background: rgba(30, 41, 59, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-label {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.card-main-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.card-value {
+  font-size: 2.25rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.indicator-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 10px currentColor;
+}
+
+.card-sub {
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+}
+
+.costs-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.cost-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.cost-row .lbl {
+  color: #94a3b8;
+}
+
+.cost-row .val {
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.color-ev {
+  color: #a855f7 !important;
+}
+
+.color-ac {
+  color: #ef4444 !important;
+}
+
+.finance-grid {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  .finance-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chart-card, .rates-card, .history-card {
+  background: rgba(30, 41, 59, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+
+.chart-card h5, .rates-card h5, .history-card h5 {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.chart-wrapper {
+  background: rgba(15, 23, 42, 0.4);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  padding: 1rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 220px;
+}
+
+.empty-chart {
+  color: #64748b;
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+.evm-svg-chart {
+  width: 100%;
+  height: 200px;
+  overflow: visible;
+}
+
+.chart-legend {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-top: 1rem;
+  font-size: 0.8rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #94a3b8;
+}
+
+.line-pv, .line-ev, .line-ac {
+  width: 12px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.line-pv { background: #64748b; }
+.line-ev { background: #a855f7; }
+.line-ac { background: #ef4444; }
+
+.members-rates-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 236px;
+  overflow-y: auto;
+}
+
+.member-rate-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+}
+
+.member-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.m-name {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #f1f5f9;
+}
+
+.m-username {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.m-role {
+  color: #a855f7;
+}
+
+.member-rate-actions {
+  display: flex;
+  align-items: center;
+}
+
+.rate-view {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.rate-amount {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+.rate-edit {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.rate-input {
+  width: 70px;
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  color: #fff;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.85rem;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-edit-sm, .btn-save-sm, .btn-cancel-sm {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: #94a3b8;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.2s;
+}
+
+.btn-edit-sm:hover, .btn-save-sm:hover, .btn-cancel-sm:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.btn-save-sm {
+  background: #22c55e;
+  border-color: #22c55e;
+  color: #fff;
+}
+
+.btn-cancel-sm {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: #fff;
+}
+
+.margin-top-lg {
+  margin-top: 1.5rem;
+}
+
+.table-responsive {
+  overflow-x: auto;
+}
+
+.evm-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.evm-table th, .evm-table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.evm-table th {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.evm-table td {
+  color: #e2e8f0;
+}
+
+.negative {
+  color: #ef4444 !important;
+}
+
+.positive {
+  color: #22c55e !important;
+}
+
+.bold {
+  font-weight: 600;
+}
+
+.text-success { color: #22c55e; }
+.text-danger { color: #ef4444; }

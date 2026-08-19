@@ -1,0 +1,127 @@
+<div class="dep-editor">
+  <div class="dep-toolbar">
+    <h3>🔗 Liên kết Task (Dependency)</h3>
+    <span class="dep-hint">FS/SS/FF/SF — predecessor hoàn thành xong mới được bắt đầu successor, v.v.</span>
+  </div>
+
+  <!-- Loading -->
+  <div *ngIf="loading()" class="loading-state">
+    <div class="spinner"></div>
+    <p>Đang tải dependency...</p>
+  </div>
+
+  <!-- Error -->
+  <div *ngIf="error() && !loading()" class="alert alert-danger">
+    ⚠️ {{ error() }}
+    <button (click)="loadData()" class="btn-secondary btn-sm">Thử lại</button>
+  </div>
+
+  <!-- Empty: chưa có task -->
+  <app-empty-state
+    *ngIf="!loading() && !error() && tasks().length === 0"
+    title="Chưa có task trong WBS"
+    description="Thêm task trong tab WBS Editor trước khi tạo dependency."
+  >
+  </app-empty-state>
+
+  <div *ngIf="!loading() && !error() && tasks().length > 0" class="dep-body">
+    <!-- Create form -->
+    <div *hasPermission="'plan:update'" class="dep-form-card">
+      <div *ngIf="formError()" class="alert alert-warning">⚠️ {{ formError() }}</div>
+      <form [formGroup]="form" (ngSubmit)="addDependency()" class="dep-form">
+        <div class="form-group">
+          <label>Successor (task bị ràng buộc) <span class="req">*</span></label>
+          <select formControlName="successorTaskId" class="form-control" (change)="onSuccessorChange()">
+            <option value="" disabled>— Chọn task —</option>
+            <option *ngFor="let t of tasks()" [value]="t.id">{{ t.taskCode }} — {{ t.taskName }}</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Predecessor (task đi trước) <span class="req">*</span></label>
+          <select formControlName="predecessorTaskId" class="form-control">
+            <option value="" disabled>— Chọn task đi trước —</option>
+            <option *ngFor="let t of availablePredecessors(form.get('successorTaskId')?.value)" [value]="t.id">
+              {{ t.taskCode }} — {{ t.taskName }}
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Loại liên kết <span class="req">*</span></label>
+          <select formControlName="dependencyType" class="form-control">
+            <option *ngFor="let k of typeKeys" [value]="k">{{ typeLabels[k] }}</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Lag (phút)</label>
+          <input type="number" formControlName="lagMinutes" class="form-control" />
+          <small class="hint-text">Giá trị âm = lead time (được phép, cần kiểm tra lịch trình).</small>
+        </div>
+
+        <div class="dep-form-actions">
+          <button type="submit" class="btn-primary" [disabled]="busy()">
+            <span *ngIf="!busy()">➕ Thêm dependency</span>
+            <span *ngIf="busy()">Đang xử lý...</span>
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Dependency list -->
+    <div class="dep-list-section">
+      <div class="list-header">
+        <h4>Danh sách dependency ({{ rows().length }})</h4>
+      </div>
+
+      <app-empty-state
+        *ngIf="rows().length === 0"
+        title="Chưa có dependency"
+        description="Tạo liên kết FS/SS/FF/SF giữa các task để scheduling engine tính lịch tự động."
+      >
+      </app-empty-state>
+
+      <div *ngIf="rows().length > 0" class="dep-table-wrap">
+        <table class="dep-table">
+          <thead>
+            <tr>
+              <th>Predecessor</th>
+              <th class="col-type">Loại</th>
+              <th>Successor</th>
+              <th class="col-lag">Lag</th>
+              <th class="col-action"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of rows()">
+              <td>{{ row.predLabel }}</td>
+              <td>
+                <span class="type-badge" [class.type-warn]="row.dep.dependencyType === 'FF' || row.dep.dependencyType === 'SF'">
+                  {{ shortType[row.dep.dependencyType] }}
+                </span>
+              </td>
+              <td>{{ row.succLabel }}</td>
+              <td>
+                <span class="lag-chip" [class.lag-negative]="row.dep.lagMinutes < 0">{{ lagMinutesFor(row.dep) }}</span>
+              </td>
+              <td>
+                <button
+                  *hasPermission="'plan:update'"
+                  (click)="deleteDependency(row)"
+                  [disabled]="busy()"
+                  class="btn-icon btn-danger-soft"
+                  title="Xóa dependency"
+                >🗑️</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="cycle-note">
+        ⚠️ Hệ thống chặn dependency vòng lặp (cycle) và liên kết chính nó — lỗi trả về hiển thị ngay khi tạo.
+      </p>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,386 @@
+<app-page-header
+  title="Quản trị Hệ thống"
+  subtitle="Quản lý người dùng, vai trò & phân quyền, nhật ký hoạt động"></app-page-header>
+
+<!-- ─── Tabs ──────────────────────────────────────────────────── -->
+<div class="admin-tabs">
+  <button class="admin-tab" [class.active]="activeTab() === 'users'" (click)="switchTab('users')">👥 Người dùng</button>
+  <button class="admin-tab" [class.active]="activeTab() === 'roles'" (click)="switchTab('roles')">🔐 Vai trò & Quyền</button>
+  <button class="admin-tab" [class.active]="activeTab() === 'audit'" (click)="switchTab('audit')">📜 Nhật ký hoạt động</button>
+</div>
+
+<!-- ═══════════════════════ USERS TAB ═══════════════════════ -->
+<section *ngIf="activeTab() === 'users'">
+  <div class="users-toolbar">
+    <div class="users-filters">
+      <input
+        class="form-control search-input"
+        type="text"
+        placeholder="🔍 Tìm theo tên đăng nhập, họ tên, email…"
+        [(ngModel)]="userKeyword"
+        (keyup.enter)="usersPage = 0; loadUsers()">
+      <select class="form-control" [(ngModel)]="userStatusFilter" (change)="usersPage = 0; loadUsers()">
+        <option value="">-- Tất cả trạng thái --</option>
+        <option value="ACTIVE">Hoạt động</option>
+        <option value="INACTIVE">Vô hiệu hóa</option>
+      </select>
+      <button class="btn btn-secondary" (click)="usersPage = 0; loadUsers()">Lọc</button>
+    </div>
+    <button class="btn btn-primary" (click)="openCreateModal()" *hasPermission="'user:manage'">＋ Tạo người dùng</button>
+  </div>
+
+  <div class="alert-danger" *ngIf="usersError()">{{ usersError() }}</div>
+  <div class="tab-loading" *ngIf="usersLoading()">Đang tải…</div>
+
+  <app-empty-state
+    *ngIf="!usersLoading() && users().length === 0"
+    icon="👥"
+    title="Chưa có người dùng"
+    description="Chưa có tài khoản nào khớp với bộ lọc"></app-empty-state>
+
+  <table class="admin-table" *ngIf="!usersLoading() && users().length > 0">
+    <thead>
+      <tr>
+        <th>Người dùng</th>
+        <th>Email</th>
+        <th>Vai trò</th>
+        <th>Trạng thái</th>
+        <th>Ngày tạo</th>
+        <th class="num">Thao tác</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let u of users()">
+        <td>
+          <div class="user-main">
+            <span class="user-avatar">{{ u.fullName.charAt(0).toUpperCase() }}</span>
+            <div>
+              <div class="user-name">{{ u.fullName }}</div>
+              <div class="user-sub">@{{ u.username }}</div>
+            </div>
+          </div>
+        </td>
+        <td>{{ u.email }}</td>
+        <td>
+          <span class="role-pill" *ngFor="let r of u.roles">{{ r }}</span>
+          <span class="muted" *ngIf="u.roles.length === 0">—</span>
+        </td>
+        <td>
+          <span class="status-badge" [class.active]="u.status === 'ACTIVE'" [class.inactive]="u.status === 'INACTIVE'">
+            {{ u.status === 'ACTIVE' ? 'Hoạt động' : 'Vô hiệu hóa' }}
+          </span>
+        </td>
+        <td class="muted">{{ (u.createdAt || '').slice(0, 10) }}</td>
+        <td class="num">
+          <div class="row-actions">
+            <button class="btn-mini" (click)="openEditModal(u)" *hasPermission="'user:manage'" [title]="'Sửa ' + u.fullName">✏️</button>
+            <button
+              class="btn-mini"
+              (click)="toggleUserStatus(u)"
+              *hasPermission="'user:manage'"
+              [class.danger]="u.status === 'ACTIVE'"
+              [disabled]="u.id === currentUserId"
+              [title]="u.status === 'ACTIVE' ? 'Vô hiệu hóa' : 'Kích hoạt'">
+              {{ u.status === 'ACTIVE' ? '🚫' : '✅' }}
+            </button>
+            <button
+              class="btn-mini"
+              (click)="openResetPasswordModal(u)"
+              *hasPermission="'user:manage'"
+              [title]="'Đặt lại mật khẩu ' + u.fullName">🔑</button>
+            <button
+              class="btn-mini danger"
+              (click)="askDeleteUser(u)"
+              *hasPermission="'user:manage'"
+              [disabled]="u.id === currentUserId || u.username === 'admin'"
+              [title]="u.id === currentUserId || u.username === 'admin' ? 'Không thể xóa tài khoản này' : 'Xóa người dùng'">🗑</button>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="pagination" *ngIf="userPages.length > 1">
+    <button class="btn btn-secondary" [disabled]="usersPage === 0" (click)="goToUsersPage(usersPage - 1)">‹ Trước</button>
+    <span class="page-info">Trang {{ usersPage + 1 }} / {{ userPages.length }} — {{ usersTotal() }} người dùng</span>
+    <button class="btn btn-secondary" [disabled]="usersPage >= userPages.length - 1" (click)="goToUsersPage(usersPage + 1)">Sau ›</button>
+  </div>
+</section>
+
+<!-- ═══════════════════════ ROLES TAB ═══════════════════════ -->
+<section *ngIf="activeTab() === 'roles'">
+  <div class="users-toolbar">
+    <div class="users-filters"></div>
+    <button class="btn btn-primary" (click)="openCreateRoleModal()" *hasPermission="'role:manage'">＋ Tạo vai trò</button>
+  </div>
+
+  <div class="alert-danger" *ngIf="rolesError()">{{ rolesError() }}</div>
+  <div class="tab-loading" *ngIf="rolesLoading()">Đang tải…</div>
+
+  <div class="role-grid" *ngIf="!rolesLoading()">
+    <div class="role-card" *ngFor="let role of roles()">
+      <div class="role-head">
+        <div>
+          <h3 class="role-name">{{ role.name }}</h3>
+          <span class="role-code">{{ role.code }}</span>
+          <span class="system-badge" *ngIf="role.isSystem" title="Vai trò hệ thống không thể xóa">HỆ THỐNG</span>
+        </div>
+        <span class="role-count">{{ role.permissions.length }} quyền</span>
+      </div>
+      <p class="role-desc">{{ role.description || '—' }}</p>
+      <div class="role-perms">
+        <span class="perm-pill" *ngFor="let p of role.permissions.slice(0, 8)">{{ p }}</span>
+        <span class="muted" *ngIf="role.permissions.length > 8">+{{ role.permissions.length - 8 }} nữa…</span>
+      </div>
+      <div class="role-actions">
+        <button class="btn btn-primary btn-block" (click)="openRoleEditor(role)" *hasPermission="'role:manage'">
+          Chỉnh sửa
+        </button>
+        <button
+          class="btn btn-danger btn-block"
+          (click)="askDeleteRole(role)"
+          *hasPermission="'role:manage'"
+          [disabled]="role.isSystem"
+          [title]="role.isSystem ? 'Vai trò hệ thống không thể xóa' : 'Xóa vai trò'">🗑 Xóa</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Role editor modal (create/edit) -->
+  <div class="modal-backdrop" *ngIf="editingRoleId || isCreateRoleMode()">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h3>{{ isCreateRoleMode() ? 'Tạo vai trò mới' : 'Chỉnh sửa vai trò — ' + roleForm.name }}</h3>
+        <button class="close-btn" (click)="closeRoleEditor()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="alert-danger" *ngIf="roleSaveMsg()">{{ roleSaveMsg() }}</div>
+
+        <div class="form-row">
+          <div class="form-group" *ngIf="isCreateRoleMode()">
+            <label>Mã vai trò <span class="req">*</span></label>
+            <input class="form-control" type="text" [(ngModel)]="roleForm.code" placeholder="VD: QA_LEAD" [disabled]="!isCreateRoleMode()">
+          </div>
+          <div class="form-group">
+            <label>Tên vai trò <span class="req">*</span></label>
+            <input class="form-control" type="text" [(ngModel)]="roleForm.name" placeholder="VD: QA Lead">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Mô tả</label>
+          <input class="form-control" type="text" [(ngModel)]="roleForm.description" placeholder="Mô tả ngắn về vai trò…">
+        </div>
+
+        <div class="perm-groups">
+          <div class="perm-group" *ngFor="let group of permissionGroups">
+            <h4 class="perm-group-title">{{ group.group }}</h4>
+            <div class="perm-items">
+              <label class="perm-item" *ngFor="let perm of group.permissions">
+                <input
+                  type="checkbox"
+                  [checked]="hasPermission(perm.code)"
+                  (change)="togglePermission(perm.code)">
+                <span>
+                  <span class="perm-code">{{ perm.code }}</span>
+                  <span class="perm-name">{{ perm.name }}</span>
+                </span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeRoleEditor()" [disabled]="roleSaving()">Hủy</button>
+        <button class="btn btn-primary" (click)="saveRole()" [disabled]="roleSaving()">
+          {{ roleSaving() ? 'Đang lưu…' : isCreateRoleMode() ? 'Tạo vai trò' : 'Lưu thay đổi' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════ AUDIT TAB ═══════════════════════ -->
+<section *ngIf="activeTab() === 'audit'">
+  <div class="users-toolbar">
+    <div class="users-filters">
+      <input
+        class="form-control search-input"
+        type="text"
+        placeholder="🔍 Hành động (VD: CREATE, UPDATE…) "
+        [(ngModel)]="auditAction"
+        (keyup.enter)="auditPage = 0; loadAuditLogs()">
+      <input
+        class="form-control search-input"
+        type="text"
+        placeholder="Loại đối tượng (VD: TASK, MEETING…)"
+        [(ngModel)]="auditEntityType"
+        (keyup.enter)="auditPage = 0; loadAuditLogs()">
+      <button class="btn btn-secondary" (click)="auditPage = 0; loadAuditLogs()">Lọc</button>
+    </div>
+  </div>
+
+  <div class="alert-danger" *ngIf="auditError()">{{ auditError() }}</div>
+  <div class="tab-loading" *ngIf="auditLoading()">Đang tải…</div>
+
+  <app-empty-state
+    *ngIf="!auditLoading() && auditLogs().length === 0"
+    icon="📜"
+    title="Không có nhật ký"
+    description="Chưa có hoạt động nào khớp với bộ lọc"></app-empty-state>
+
+  <table class="admin-table" *ngIf="!auditLoading() && auditLogs().length > 0">
+    <thead>
+      <tr>
+        <th>Thời gian</th>
+        <th>Người thực hiện</th>
+        <th>Hành động</th>
+        <th>Đối tượng</th>
+        <th>Entity ID</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let log of auditLogs()">
+        <td class="muted">{{ formatInstant(log.createdAt) }}</td>
+        <td>{{ log.actorUsername || 'Hệ thống' }}</td>
+        <td><span class="action-badge">{{ log.action }}</span></td>
+        <td>{{ log.entityType }}</td>
+        <td class="entity-id">{{ log.entityId ? log.entityId.slice(0, 8) + '…' : '—' }}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="pagination" *ngIf="auditPages.length > 1">
+    <button class="btn btn-secondary" [disabled]="auditPage === 0" (click)="goToAuditPage(auditPage - 1)">‹ Trước</button>
+    <span class="page-info">Trang {{ auditPage + 1 }} / {{ auditPages.length }} — {{ auditTotal() }} bản ghi</span>
+    <button class="btn btn-secondary" [disabled]="auditPage >= auditPages.length - 1" (click)="goToAuditPage(auditPage + 1)">Sau ›</button>
+  </div>
+</section>
+
+<!-- ═══════════════════════ USER MODAL (create/edit) ═══════════════════════ -->
+<div class="modal-backdrop" *ngIf="showUserModal()">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3>{{ isEditMode() ? 'Sửa người dùng' : 'Tạo người dùng' }}</h3>
+      <button class="close-btn" (click)="closeUserModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="alert-danger" *ngIf="userFormError()">{{ userFormError() }}</div>
+
+      <div class="form-group">
+        <label>Tên đăng nhập <span class="req">*</span></label>
+        <input class="form-control" type="text" [(ngModel)]="userForm.username" [disabled]="isEditMode()" placeholder="VD: tuan.nguyen">
+      </div>
+
+      <div class="form-group">
+        <label>Họ tên <span class="req">*</span></label>
+        <input class="form-control" type="text" [(ngModel)]="userForm.fullName" placeholder="VD: Nguyễn Văn Tuấn">
+      </div>
+
+      <div class="form-group">
+        <label>Email <span class="req">*</span></label>
+        <input class="form-control" type="email" [(ngModel)]="userForm.email" placeholder="VD: tuan.nguyen@pmdaily.local">
+      </div>
+
+      <div class="form-group" *ngIf="!isEditMode()">
+        <label>Mật khẩu <span class="req">*</span></label>
+        <input class="form-control" type="password" [(ngModel)]="userForm.password" placeholder="Tối thiểu 8 ký tự, có hoa/thường/số/ký tự đặc biệt">
+      </div>
+
+      <div class="form-group" *ngIf="!isEditMode()">
+        <label>Trạng thái</label>
+        <select class="form-control" [(ngModel)]="userForm.status">
+          <option value="ACTIVE">Hoạt động</option>
+          <option value="INACTIVE">Vô hiệu hóa</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Vai trò</label>
+        <div class="role-checkboxes">
+          <label class="role-checkbox" *ngFor="let role of availableRoles()">
+            <input
+              type="checkbox"
+              [checked]="isRoleChecked(role.id)"
+              (change)="toggleRole(role.id)">
+            <span>{{ role.name }} <em>({{ role.code }})</em></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group" *ngIf="userForm.roleIds.length > 0">
+        <label>Quyền tổng hợp từ vai trò đã chọn ({{ selectedRolePermissions.length }})</label>
+        <div class="preview-perms">
+          <span class="perm-pill" *ngFor="let p of selectedRolePermissions">{{ p }}</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" (click)="closeUserModal()" [disabled]="userSubmitting()">Hủy</button>
+      <button class="btn btn-primary" (click)="saveUser()" [disabled]="userSubmitting()">
+        {{ userSubmitting() ? 'Đang lưu…' : isEditMode() ? 'Cập nhật' : 'Tạo' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ RESET PASSWORD MODAL ═══════════ -->
+<div class="modal-backdrop" *ngIf="showResetPasswordModal()">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3>Đặt lại mật khẩu — @{{ resetPasswordUsername }}</h3>
+      <button class="close-btn" (click)="closeResetPasswordModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="alert-danger" *ngIf="resetPasswordError()">{{ resetPasswordError() }}</div>
+      <div class="form-group">
+        <label>Mật khẩu mới <span class="req">*</span></label>
+        <input class="form-control" type="password" [(ngModel)]="resetPasswordForm.newPassword" placeholder="Tối thiểu 8 ký tự, có hoa/thường/số/ký tự đặc biệt">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" (click)="closeResetPasswordModal()" [disabled]="resetPasswordSubmitting()">Hủy</button>
+      <button class="btn btn-primary" (click)="submitResetPassword()" [disabled]="resetPasswordSubmitting()">
+        {{ resetPasswordSubmitting() ? 'Đang đặt lại…' : 'Đặt lại mật khẩu' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ CONFIRM DELETE USER ═══════════ -->
+<div class="modal-backdrop" *ngIf="showDeleteUserConfirm()">
+  <div class="modal-card modal-sm">
+    <div class="modal-header">
+      <h3>Xóa người dùng?</h3>
+      <button class="close-btn" (click)="showDeleteUserConfirm.set(false)">✕</button>
+    </div>
+    <div class="modal-body">
+      <p>Bạn có chắc muốn xóa người dùng <strong>@{{ deletingUsername }}</strong>? Tài khoản này sẽ bị vô hiệu hóa vĩnh viễn (soft-delete).</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" (click)="showDeleteUserConfirm.set(false)" [disabled]="deletingUserSubmitting()">Hủy</button>
+      <button class="btn btn-danger" (click)="confirmDeleteUser()" [disabled]="deletingUserSubmitting()">
+        {{ deletingUserSubmitting() ? 'Đang xóa…' : 'Xóa' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ CONFIRM DELETE ROLE ═══════════ -->
+<div class="modal-backdrop" *ngIf="showDeleteRoleConfirm()">
+  <div class="modal-card modal-sm">
+    <div class="modal-header">
+      <h3>Xóa vai trò?</h3>
+      <button class="close-btn" (click)="showDeleteRoleConfirm.set(false)">✕</button>
+    </div>
+    <div class="modal-body">
+      <p>Bạn có chắc muốn xóa vai trò <strong>{{ deletingRoleName }}</strong>? Hành động này không thể hoàn tác.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" (click)="showDeleteRoleConfirm.set(false)" [disabled]="deletingRoleSubmitting()">Hủy</button>
+      <button class="btn btn-danger" (click)="confirmDeleteRole()" [disabled]="deletingRoleSubmitting()">
+        {{ deletingRoleSubmitting() ? 'Đang xóa…' : 'Xóa' }}
+      </button>
+    </div>
+  </div>
+</div>

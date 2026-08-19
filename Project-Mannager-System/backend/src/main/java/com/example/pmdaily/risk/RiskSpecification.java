@@ -1,0 +1,69 @@
+package com.example.pmdaily.risk;
+
+import java.util.Locale;
+import java.util.UUID;
+
+import org.springframework.data.jpa.domain.Specification;
+
+import jakarta.persistence.criteria.Subquery;
+
+import com.example.pmdaily.project.ProjectMember;
+
+public final class RiskSpecification {
+
+    private RiskSpecification() {
+    }
+
+    public static Specification<Risk> notDeleted() {
+        return (root, query, cb) -> cb.isNull(root.get("deletedAt"));
+    }
+
+    public static Specification<Risk> keyword(String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return null;
+        }
+        String like = "%" + keyword.trim().toLowerCase(Locale.ROOT) + "%";
+        return (root, query, cb) -> cb.or(
+                cb.like(cb.lower(root.get("title")), like),
+                cb.like(cb.lower(root.get("code")), like)
+        );
+    }
+
+    public static Specification<Risk> projectId(UUID projectId) {
+        if (projectId == null) {
+            return null;
+        }
+        return (root, query, cb) -> cb.equal(root.get("project").get("id"), projectId);
+    }
+
+    public static Specification<Risk> status(RiskStatus status) {
+        if (status == null) {
+            return null;
+        }
+        return (root, query, cb) -> cb.equal(root.get("status"), status);
+    }
+
+    public static Specification<Risk> level(RiskLevel level) {
+        if (level == null) {
+            return null;
+        }
+        return (root, query, cb) -> cb.equal(root.get("level"), level);
+    }
+
+    public static Specification<Risk> ownerId(UUID ownerId) {
+        if (ownerId == null) {
+            return null;
+        }
+        return (root, query, cb) -> cb.equal(root.get("owner").get("id"), ownerId);
+    }
+
+    public static Specification<Risk> memberOf(UUID userId) {
+        return (root, query, cb) -> {
+            Subquery<UUID> sub = query.subquery(UUID.class);
+            var member = sub.from(ProjectMember.class);
+            sub.select(member.get("project").get("id"))
+                    .where(cb.equal(member.get("user").get("id"), userId));
+            return cb.in(root.get("project").get("id")).value(sub);
+        };
+    }
+}

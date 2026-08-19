@@ -1,0 +1,259 @@
+<div class="plan-version-baseline">
+  <div class="vb-toolbar">
+    <h3>📦 Phiên bản & Baseline</h3>
+    <div class="vb-actions">
+      <ng-container *hasPermission="'plan:version'">
+        <button (click)="openCreateVersion()" class="btn-secondary btn-sm">➕ Tạo version</button>
+      </ng-container>
+      <ng-container *hasPermission="'plan:baseline'">
+        <button
+          (click)="openCreateBaseline()"
+          [disabled]="!canBaseline()"
+          class="btn-primary btn-sm"
+          [title]="canBaseline() ? '' : 'Chỉ tạo được baseline khi plan APPROVED'"
+        >📌 Tạo baseline</button>
+      </ng-container>
+    </div>
+  </div>
+
+  <div *ngIf="actionError()" class="alert alert-danger">⚠️ {{ actionError() }}</div>
+  <div *ngIf="!canBaseline()" class="alert alert-info">
+    ℹ️ Baseline chỉ tạo được khi plan ở trạng thái <strong>APPROVED</strong> (hiện tại: {{ planStatus }}).
+  </div>
+
+  <div *ngIf="loading()" class="loading-state">
+    <div class="spinner"></div>
+    <p>Đang tải...</p>
+  </div>
+
+  <div *ngIf="error() && !loading()" class="alert alert-danger">⚠️ {{ error() }}</div>
+
+  <div *ngIf="!loading() && !error()" class="vb-body">
+    <!-- Versions -->
+    <div class="section-card">
+      <h4>Phiên bản kế hoạch ({{ versions().length }})</h4>
+      <app-empty-state
+        *ngIf="versions().length === 0"
+        title="Chưa có phiên bản"
+        description="Tạo version để chụp snapshot plan (WBS, dependency, resource) tại thời điểm."
+      >
+      </app-empty-state>
+      <div *ngIf="versions().length > 0" class="version-list">
+        <div *ngFor="let v of versions()" class="version-row" [class.row-active]="v.isActive">
+          <div class="v-main">
+            <span class="v-badge" [class.v-active]="v.isActive">v{{ v.versionNo }}</span>
+            <div class="v-info">
+              <div class="v-title">
+                <strong>{{ v.status }}</strong>
+                <span class="v-note" *ngIf="v.note">— {{ v.note }}</span>
+              </div>
+              <div class="v-meta">
+                {{ v.createdAt | date:'dd/MM/yyyy HH:mm' }} · {{ v.taskCount }} task · {{ v.dependencyCount }} dep · {{ v.resourceCount }} resource
+              </div>
+            </div>
+          </div>
+          <div class="v-actions">
+            <button (click)="openDiff(v)" class="btn-secondary btn-xs">So sánh</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Baselines -->
+    <div class="section-card">
+      <h4>Baselines ({{ baselines().length }})</h4>
+      <app-empty-state
+        *ngIf="baselines().length === 0"
+        title="Chưa có baseline"
+        description="Chốt baseline sau khi duyệt kế hoạch (APPROVED) để theo dõi variance so với thực tế."
+      >
+      </app-empty-state>
+      <div *ngIf="baselines().length > 0" class="baseline-list">
+        <div *ngFor="let b of baselines()" class="baseline-row">
+          <div class="b-main">
+            <span class="b-badge">BL #{{ b.baselineNum }}</span>
+            <div class="b-info">
+              <div class="b-title">
+                <strong>{{ b.description || 'Baseline ' + b.baselineNum }}</strong>
+              </div>
+              <div class="b-meta">
+                {{ b.capturedAt | date:'dd/MM/yyyy HH:mm' }} · từ version v{{ b.versionNo }} · {{ b.taskCount }} task
+              </div>
+            </div>
+          </div>
+          <div class="b-actions">
+            <button (click)="openVariance(b)" class="btn-secondary btn-xs">📊 Variance</button>
+            <button *hasPermission="'plan:baseline'" (click)="deleteBaseline(b)" class="btn-danger-soft btn-xs">🗑️</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Create version modal ──────────────────────────────── -->
+  <div *ngIf="showVersionModal()" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Tạo phiên bản mới</h3>
+        <button (click)="closeVersionModal()" class="close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <form [formGroup]="versionForm" (ngSubmit)="createVersion()">
+          <div class="form-group">
+            <label>Ghi chú</label>
+            <textarea formControlName="note" rows="3" class="form-control" placeholder="Thay đổi chính trong phiên bản này..."></textarea>
+          </div>
+          <div class="modal-footer">
+            <button type="button" (click)="closeVersionModal()" class="btn-secondary">Hủy</button>
+            <button type="submit" class="btn-primary" [disabled]="busy()">
+              <span *ngIf="!busy()">Tạo version</span>
+              <span *ngIf="busy()">Đang xử lý...</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Create baseline modal ─────────────────────────────── -->
+  <div *ngIf="showBaselineModal()" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Chốt baseline</h3>
+        <button (click)="closeBaselineModal()" class="close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="baseline-hint">Baseline chụp trạng thái hiện tại làm mốc so sánh. Dữ liệu bất biến theo thời gian.</p>
+        <form [formGroup]="baselineForm" (ngSubmit)="createBaseline()">
+          <div class="form-group">
+            <label>Mô tả</label>
+            <input type="text" formControlName="description" class="form-control" maxlength="500" placeholder="VD: Chốt baseline giai đoạn phát triển" />
+          </div>
+          <div class="modal-footer">
+            <button type="button" (click)="closeBaselineModal()" class="btn-secondary">Hủy</button>
+            <button type="submit" class="btn-primary" [disabled]="busy()">
+              <span *ngIf="!busy()">Chốt baseline</span>
+              <span *ngIf="busy()">Đang xử lý...</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Diff modal ────────────────────────────────────────── -->
+  <div *ngIf="showDiffModal()" class="modal-backdrop">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h3 *ngIf="diff()">So sánh v{{ diff()?.versionNo }} → v{{ diff()?.compareToVersionNo }}</h3>
+        <h3 *ngIf="!diff()">So sánh phiên bản</h3>
+        <button (click)="closeDiff()" class="close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div *ngIf="diffBusy()" class="loading-state">
+          <div class="spinner"></div>
+          <p>Đang so sánh...</p>
+        </div>
+        <div *ngIf="diffError() && !diffBusy()" class="alert alert-danger">⚠️ {{ diffError() }}</div>
+        <app-empty-state
+          *ngIf="!diffBusy() && !diffError() && diffRows().length === 0"
+          title="Không có thay đổi"
+          description="Hai phiên bản này giống hệt nhau về WBS tới cấp field."
+        >
+        </app-empty-state>
+        <div *ngIf="!diffBusy() && !diffError() && diffRows().length > 0" class="diff-wrap">
+          <table class="diff-table">
+            <thead>
+              <tr>
+                <th>WBS</th>
+                <th>Task</th>
+                <th>Field</th>
+                <th>Từ</th>
+                <th>Đến</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let d of diffRows()">
+                <td>{{ d.wbsCode }}</td>
+                <td>{{ d.taskName }}</td>
+                <td><span class="field-chip">{{ d.field }}</span></td>
+                <td class="from-val">{{ fmtValue(d.fromValue) }}</td>
+                <td class="to-val">{{ fmtValue(d.toValue) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Variance modal ────────────────────────────────────── -->
+  <div *ngIf="showVarianceModal()" class="modal-backdrop">
+    <div class="modal-card modal-xl">
+      <div class="modal-header">
+        <h3 *ngIf="variance()">Variance BL #{{ variance()?.baselineNum }} vs Current — {{ variance()?.planName }}</h3>
+        <h3 *ngIf="!variance()">Variance so với current</h3>
+        <button (click)="closeVariance()" class="close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div *ngIf="varianceBusy()" class="loading-state">
+          <div class="spinner"></div>
+          <p>Đang tính variance...</p>
+        </div>
+        <div *ngIf="varianceError() && !varianceBusy()" class="alert alert-danger">⚠️ {{ varianceError() }}</div>
+        <app-empty-state
+          *ngIf="!varianceBusy() && !varianceError() && varianceRows().length === 0"
+          title="Không có dữ liệu variance"
+          description="Danh sách task của plan chưa có dữ liệu so sánh."
+        >
+        </app-empty-state>
+        <div *ngIf="!varianceBusy() && !varianceError() && varianceRows().length > 0" class="var-wrap">
+          <table class="var-table">
+            <thead>
+              <tr>
+                <th>WBS</th>
+                <th>Task</th>
+                <th>Start (BL → Cur)</th>
+                <th>Finish (BL → Cur)</th>
+                <th>Duration</th>
+                <th>Effort</th>
+                <th>Progress</th>
+                <th>Ghi chú</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let r of varianceRows()" [class.row-deleted]="r.taskDeleted">
+                <td>{{ r.wbsCode }}</td>
+                <td>{{ r.taskName }}</td>
+                <td class="dates">{{ r.baselineStart || '—' }} → {{ r.currentStart || '—' }}</td>
+                <td class="dates">{{ r.baselineFinish || '—' }} → {{ r.currentFinish || '—' }}</td>
+                <td>
+                  <span class="var-chip" [class]="variantClass(r.durationDifferenceMinutes ?? 0)">
+                    {{ fmtMinutes(r.baselineDurationMinutes) }} → {{ fmtMinutes(r.currentDurationMinutes) }}
+                    ({{ fmtMinutes(r.durationDifferenceMinutes) }})
+                  </span>
+                </td>
+                <td>
+                  <span class="var-chip" [class]="variantClass(r.effortDifferenceMinutes ?? 0)">
+                    {{ fmtMinutes(r.baselineEffortMinutes) }} → {{ fmtMinutes(r.currentEffortMinutes) }}
+                  </span>
+                </td>
+                <td>
+                  <span class="var-chip" [class]="variantClass(r.progressDifference)">
+                    {{ r.baselineProgress }}% → {{ r.currentProgress }}% ({{ r.progressDifference > 0 ? '+' : '' }}{{ r.progressDifference }})
+                  </span>
+                </td>
+                <td>
+                  <span *ngIf="r.taskDeleted" class="note-chip note-deleted">Đã xóa</span>
+                  <span *ngIf="r.milestoneDone" class="note-chip note-done">Mốc hoàn thành</span>
+                  <span *ngIf="(r.startDifferenceDays ?? 0) > 0" class="note-chip note-delay">Trễ start {{ fmtDays(r.startDifferenceDays) }}</span>
+                  <span *ngIf="(r.finishDifferenceDays ?? 0) > 0" class="note-chip note-delay">Trễ finish {{ fmtDays(r.finishDifferenceDays) }}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,131 @@
+<div class="plan-scheduling">
+  <!-- Toolbar -->
+  <div class="sched-toolbar">
+    <h3>⚙️ Lịch trình & Đường găng</h3>
+    <div class="toolbar-actions">
+      <ng-container *hasPermission="'plan:schedule'">
+        <button (click)="runRecalc()" [disabled]="recalcBusy()" class="btn-primary btn-sm">
+          <span *ngIf="!recalcBusy()">▶️ Tính lại lịch trình (Recalc)</span>
+          <span *ngIf="recalcBusy()">⏳ Đang tính...</span>
+        </button>
+      </ng-container>
+    </div>
+  </div>
+
+  <div *ngIf="recalcError()" class="alert alert-danger">⚠️ {{ recalcError() }}</div>
+
+  <!-- Recalc result -->
+  <div *ngIf="recalc()" class="recalc-card">
+    <div class="recalc-header">
+      <h4>Kết quả Recalculation</h4>
+      <span class="recalc-ok" *ngIf="warningList().length === 0">✓ Không có cảnh báo</span>
+      <span class="recalc-warn" *ngIf="warningList().length > 0">⚠ {{ warningList().length }} cảnh báo</span>
+    </div>
+    <div class="recalc-grid">
+      <div class="recalc-item">
+        <span class="label">Phạm vi lịch:</span>
+        <span class="val">{{ recalc()?.plannedStart || '—' }} → {{ recalc()?.plannedFinish || '—' }}</span>
+      </div>
+      <div class="recalc-item">
+        <span class="label">Thời lượng:</span>
+        <span class="val">{{ formatMinutes(recalc()?.durationMinutes) }}</span>
+      </div>
+      <div class="recalc-item">
+        <span class="label">Task đã đặt lịch:</span>
+        <span class="val">{{ recalc()?.scheduledTasks }}/{{ recalc()?.totalTasks }}</span>
+      </div>
+    </div>
+
+    <div *ngIf="warningList().length > 0" class="warnings-box">
+      <h5>Cảnh báo từ scheduling engine</h5>
+      <table class="warn-table">
+        <thead>
+          <tr>
+            <th class="col-wbs">WBS</th>
+            <th>Loại</th>
+            <th>Nội dung</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let w of warningList()">
+            <td>{{ w.wbsCode }}</td>
+            <td>
+              <span class="warn-badge" [class]="warningTypeClass(w.type)">
+                {{ warningLabels[w.type] }}
+              </span>
+            </td>
+            <td>{{ w.message }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Critical path -->
+  <div class="cp-section">
+    <div class="cp-header">
+      <h4>Đường găng (Critical Path)</h4>
+      <span class="cp-meta" *ngIf="critical()">
+        {{ criticalCount() }} task quan trọng · threshold {{ critical()?.thresholdMinutes }} phút
+      </span>
+    </div>
+
+    <div *ngIf="criticalLoading()" class="loading-state">
+      <div class="spinner"></div>
+      <p>Đang tính critical path...</p>
+    </div>
+
+    <div *ngIf="criticalError() && !criticalLoading()" class="alert alert-danger">
+      ⚠️ {{ criticalError() }}
+      <button (click)="loadCritical()" class="btn-secondary btn-sm">Thử lại</button>
+    </div>
+
+    <app-empty-state
+      *ngIf="!criticalLoading() && !criticalError() && criticalTasks().length === 0"
+      title="Chưa có dữ liệu critical path"
+      description="Chạy Recalc để scheduling engine tính early/late dates và float cho từng task."
+    >
+    </app-empty-state>
+
+    <div *ngIf="!criticalLoading() && !criticalError() && criticalTasks().length > 0" class="cp-table-wrap">
+      <table class="cp-table">
+        <thead>
+          <tr>
+            <th class="col-wbs">WBS</th>
+            <th>Task</th>
+            <th>Loại</th>
+            <th>Early</th>
+            <th>Late</th>
+            <th>Float (total/free)</th>
+            <th>Trạng thái</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let t of criticalTasks()">
+            <td>{{ t.wbsCode }}</td>
+            <td class="task-name">{{ t.taskName }}</td>
+            <td>
+              <span class="type-chip">{{ typeLabels[t.taskType] }}</span>
+            </td>
+            <td>
+              <span class="dates">{{ t.earlyStart || '—' }} → {{ t.earlyFinish || '—' }}</span>
+            </td>
+            <td>
+              <span class="dates">{{ t.lateStart || '—' }} → {{ t.lateFinish || '—' }}</span>
+            </td>
+            <td>
+              <span class="float-chip" [class.float-zero]="t.totalFloatMinutes === 0">
+                {{ formatFloat(t.totalFloatMinutes) }} / {{ formatFloat(t.freeFloatMinutes) }}
+              </span>
+            </td>
+            <td>
+              <span class="critical-chip" [class.not-critical]="!t.isCritical">
+                {{ t.isCritical ? 'Đường găng' : 'Ngoài găng' }}
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

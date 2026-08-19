@@ -1,0 +1,24 @@
+# === Backend (Maven) ===
+backend/target/
+*.jar
+*.war
+
+# === Frontend (Node/Angular) ===
+node_modules/
+frontend/dist/
+frontend/.angular/
+*.tsbuildinfo
+
+# === Database & env ===
+.env
+.env.local
+*.log
+
+# === IDE ===
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# === OS ===

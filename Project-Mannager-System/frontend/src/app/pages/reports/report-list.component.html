@@ -1,0 +1,222 @@
+<app-page-header
+  title="Báo cáo"
+  subtitle="Thống kê tiến độ công việc, tình trạng dự án và rủi ro"></app-page-header>
+
+<!-- ─── Toolbar: Filters + Export ─────────────────────────────── -->
+<div class="report-toolbar">
+  <div class="filters">
+    <div class="filter-field">
+      <label class="filter-label" for="report-project">Dự án</label>
+      <select id="report-project" class="form-control" [(ngModel)]="selectedProjectId">
+        <option value="">-- Tất cả dự án --</option>
+        <option *ngFor="let p of projectsList()" [value]="p.id">{{ p.name }}</option>
+      </select>
+    </div>
+    <div class="filter-field">
+      <label class="filter-label" for="report-from">Từ ngày</label>
+      <input id="report-from" type="date" class="form-control" [(ngModel)]="fromDate" [max]="today">
+    </div>
+    <div class="filter-field">
+      <label class="filter-label" for="report-to">Đến ngày</label>
+      <input id="report-to" type="date" class="form-control" [(ngModel)]="toDate" [min]="fromDate || undefined" [max]="today">
+    </div>
+    <button class="btn btn-primary" (click)="loadReport()">Lọc</button>
+    <button class="btn btn-secondary" (click)="resetFilters()" *ngIf="hasFilters()">Xóa bộ lọc</button>
+  </div>
+  <button
+    class="btn btn-success btn-export"
+    (click)="exportReport()"
+    [disabled]="exporting() || loading()">
+    {{ exporting() ? 'Đang xuất…' : '⬇ Xuất CSV' }}
+  </button>
+</div>
+
+<!-- ─── Tabs ──────────────────────────────────────────────────── -->
+<div class="report-tabs">
+  <button
+    *ngFor="let tab of reportTabs"
+    class="report-tab"
+    [class.active]="activeTab() === tab.key"
+    (click)="switchTab(tab.key)">
+    {{ tab.label }}
+  </button>
+</div>
+
+<div class="alert-danger" *ngIf="error()">{{ error() }}</div>
+
+<!-- ─── Loading ───────────────────────────────────────────────── -->
+<div *ngIf="loading()" class="report-loading">Đang tải dữ liệu…</div>
+
+<!-- ═══════════════ 1. Theo trạng thái ═══════════════ -->
+<section *ngIf="activeTab() === 'tasks-by-status' && !loading()">
+  <app-empty-state
+    *ngIf="statusReport().length === 0"
+    icon="📊"
+    title="Chưa có dữ liệu"
+    description="Chưa có task nào khớp với bộ lọc hiện tại"></app-empty-state>
+
+  <div class="bar-chart" *ngIf="statusReport().length > 0">
+    <div class="bar-row" *ngFor="let item of statusReport()">
+      <span class="bar-label">{{ statusLabels[item.status] || item.status }}</span>
+      <div class="bar-track">
+        <div
+          class="bar-fill"
+          [style.width.%]="(item.count / maxCount(statusReport())) * 100"
+          [style.background]="statusColors[item.status] || '#3b82f6'"></div>
+      </div>
+      <span class="bar-value">{{ item.count }}</span>
+    </div>
+  </div>
+
+  <table class="report-table" *ngIf="statusReport().length > 0">
+    <thead>
+      <tr><th>Trạng thái</th><th class="num">Số task</th></tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let item of statusReport()">
+        <td>
+          <span class="status-pill" [style.background]="statusColors[item.status] || '#3b82f6'">{{ statusLabels[item.status] || item.status }}</span>
+        </td>
+        <td class="num">{{ item.count }}</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════ 2. Theo người làm ═══════════════ -->
+<section *ngIf="activeTab() === 'tasks-by-assignee' && !loading()">
+  <app-empty-state
+    *ngIf="assigneeReport().length === 0"
+    icon="👤"
+    title="Chưa có dữ liệu"
+    description="Chưa có task nào được gán trong phạm vi bộ lọc"></app-empty-state>
+
+  <table class="report-table" *ngIf="assigneeReport().length > 0">
+    <thead>
+      <tr><th>Người làm</th><th class="num">Tổng task</th><th class="num">Đã hoàn thành</th><th class="num">Tỷ lệ hoàn thành</th></tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let item of assigneeReport()">
+        <td class="user-cell">
+          <span class="avatar">{{ (item.fullName || '?').charAt(0).toUpperCase() }}</span>
+          {{ item.fullName }}
+        </td>
+        <td class="num">{{ item.count }}</td>
+        <td class="num">{{ item.doneCount }}</td>
+        <td class="num">
+          <div class="mini-progress">
+            <div class="mini-fill" [style.width.%]="item.count > 0 ? (item.doneCount / item.count) * 100 : 0"></div>
+          </div>
+          <span class="mini-pct">{{ item.count > 0 ? Math.round((item.doneCount / item.count) * 100) : 0 }}%</span>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════ 3. Task trễ hạn ═══════════════ -->
+<section *ngIf="activeTab() === 'overdue-tasks' && !loading()">
+  <div class="overdue-summary" *ngIf="overdueTotal() > 0">
+    Có <strong>{{ overdueTotal() }}</strong> task đang quá hạn trong phạm vi hiện tại
+  </div>
+  <app-empty-state
+    *ngIf="overdueTasks().length === 0"
+    icon="⏰"
+    title="Không có task trễ hạn"
+    description="Tất cả task đều trong hạn 🎉"></app-empty-state>
+
+  <table class="report-table" *ngIf="overdueTasks().length > 0">
+    <thead>
+      <tr><th>Task</th><th>Dự án</th><th>Người làm</th><th>Hạn chót</th></tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let t of overdueTasks()">
+        <td class="task-title">{{ t.title }}</td>
+        <td>{{ t.projectName || t.project?.name || '—' }}</td>
+        <td>{{ t.assigneeName || t.assignee?.fullName || '—' }}</td>
+        <td class="overdue-date">{{ (t.dueDate || t.dueAt || '').slice(0, 10) }}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="pagination" *ngIf="overduePages.length > 1">
+    <button class="btn btn-secondary" [disabled]="overduePage === 0" (click)="goToOverduePage(overduePage - 1)">‹ Trước</button>
+    <span class="page-info">Trang {{ overduePage + 1 }} / {{ overduePages.length }}</span>
+    <button class="btn btn-secondary" [disabled]="overduePage >= overduePages.length - 1" (click)="goToOverduePage(overduePage + 1)">Sau ›</button>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. Tiến độ dự án ═══════════════ -->
+<section *ngIf="activeTab() === 'project-progress' && !loading()">
+  <app-empty-state
+    *ngIf="progressReport().length === 0"
+    icon="📈"
+    title="Chưa có dữ liệu"
+    description="Không tìm thấy dự án nào"></app-empty-state>
+
+  <div class="progress-list" *ngIf="progressReport().length > 0">
+    <div class="progress-card" *ngFor="let item of progressReport()">
+      <div class="progress-head">
+        <span class="progress-code">{{ item.code }}</span>
+        <span class="progress-name">{{ item.name }}</span>
+        <span class="progress-pct">{{ item.progress }}%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" [style.width.%]="item.progress"></div>
+      </div>
+      <div class="progress-meta">
+        Hoàn thành <strong>{{ item.doneTasks }}</strong> / {{ item.totalTasks }} task
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 5. Risk & Issue summary ═══════════════ -->
+<section *ngIf="activeTab() === 'risk-issue-summary' && !loading()">
+  <div class="alert-info" *ngIf="!selectedProjectId && !error()">
+    Vui lòng chọn dự án ở bộ lọc phía trên để xem tổng hợp Risk & Issue.
+  </div>
+
+  <ng-container *ngIf="riskIssueReport()">
+    <div class="kpi-grid">
+      <div class="kpi-card kpi-risk">
+        <span class="kpi-label">Rủi ro đang mở</span>
+        <span class="kpi-value">{{ riskIssueReport()!.openRisks }}</span>
+      </div>
+      <div class="kpi-card kpi-issue">
+        <span class="kpi-label">Issue đang mở</span>
+        <span class="kpi-value">{{ riskIssueReport()!.openIssues }}</span>
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-card">
+        <h4 class="summary-title">Rủi ro theo mức độ</h4>
+        <app-empty-state *ngIf="riskIssueReport()!.risksByLevel.length === 0" icon="⚠️" title="Không có rủi ro"></app-empty-state>
+        <table class="report-table" *ngIf="riskIssueReport()!.risksByLevel.length > 0">
+          <thead><tr><th>Mức độ</th><th class="num">Số lượng</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let item of riskIssueReport()!.risksByLevel">
+              <td><span class="status-pill" [style.background]="levelColor(item.level)">{{ levelLabels[item.level] || item.level }}</span></td>
+              <td class="num">{{ item.count }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="summary-card">
+        <h4 class="summary-title">Issue theo mức độ nghiêm trọng</h4>
+        <app-empty-state *ngIf="riskIssueReport()!.issuesBySeverity.length === 0" icon="🐞" title="Không có issue"></app-empty-state>
+        <table class="report-table" *ngIf="riskIssueReport()!.issuesBySeverity.length > 0">
+          <thead><tr><th>Mức độ</th><th class="num">Số lượng</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let item of riskIssueReport()!.issuesBySeverity">
+              <td><span class="status-pill" [style.background]="severityColor(item.severity)">{{ severityLabels[item.severity] || item.severity }}</span></td>
+              <td class="num">{{ item.count }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </ng-container>
+</section>

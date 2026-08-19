@@ -1,0 +1,197 @@
+<div class="projects-page">
+  <app-page-header title="Quản lý Dự án" subtitle="Quản lý danh sách dự án, tiến độ, thành viên và vai trò trong dự án">
+    <button *hasPermission="'project:create'" (click)="openCreateModal()" class="btn-primary">
+      ➕ Tạo mới dự án
+    </button>
+  </app-page-header>
+
+  <!-- Filter Bar -->
+  <div class="filter-bar">
+    <div class="search-box">
+      <span class="icon">🔍</span>
+      <input
+        type="text"
+        [(ngModel)]="keyword"
+        (keyup.enter)="onFilter()"
+        placeholder="Tìm kiếm mã, tên dự án, khách hàng..."
+        class="form-control"
+      />
+    </div>
+
+    <div class="filter-select">
+      <select [(ngModel)]="selectedStatus" (change)="onFilter()" class="form-control">
+        <option value="">-- Tất cả trạng thái --</option>
+        <option value="PLANNING">Lập kế hoạch (PLANNING)</option>
+        <option value="ACTIVE">Đang hoạt động (ACTIVE)</option>
+        <option value="ON_HOLD">Tạm dừng (ON_HOLD)</option>
+        <option value="COMPLETED">Hoàn tất (COMPLETED)</option>
+        <option value="CANCELLED">Đã hủy (CANCELLED)</option>
+      </select>
+    </div>
+
+    <div class="filter-checkbox">
+      <label>
+        <input type="checkbox" [(ngModel)]="myOnly" (change)="onFilter()" />
+        Chỉ dự án tôi tham gia
+      </label>
+    </div>
+
+    <button (click)="onFilter()" class="btn-secondary">Tìm kiếm</button>
+    <button *ngIf="keyword || selectedStatus || myOnly" (click)="resetFilter()" class="btn-text">Xóa bộ lọc</button>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading()" class="loading-state">
+    <div class="spinner"></div>
+    <p>Đang tải danh sách dự án...</p>
+  </div>
+
+  <!-- Empty State -->
+  <app-empty-state
+    *ngIf="!loading() && projects().length === 0"
+    title="Không tìm thấy dự án nào"
+    description="Thử thay đổi bộ lọc tìm kiếm hoặc tạo mới một dự án để bắt đầu quản lý công việc."
+  >
+    <button *hasPermission="'project:create'" (click)="openCreateModal()" class="btn-primary">
+      Tạo dự án đầu tiên
+    </button>
+  </app-empty-state>
+
+  <!-- Projects Cards Grid -->
+  <div *ngIf="!loading() && projects().length > 0" class="projects-grid">
+    <div *ngFor="let p of projects()" class="project-card">
+      <div class="card-top">
+        <div class="code-badge">{{ p.code }}</div>
+        <app-status-chip [status]="p.status"></app-status-chip>
+      </div>
+
+      <h3 class="prj-title">
+        <a [routerLink]="['/projects', p.id]">{{ p.name }}</a>
+      </h3>
+
+      <p *ngIf="p.customerName" class="prj-customer">Khách hàng: <strong>{{ p.customerName }}</strong></p>
+      <p *ngIf="p.description" class="prj-desc">{{ p.description }}</p>
+
+      <div class="progress-section">
+        <div class="progress-info">
+          <span>Tiến độ</span>
+          <span class="progress-val">{{ p.progress }}%</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" [style.width.%]="p.progress"></div>
+        </div>
+      </div>
+
+      <div class="card-meta">
+        <span class="meta-item">👥 {{ p.memberCount }} thành viên</span>
+        <span *ngIf="p.projectManagerName" class="meta-item">👑 PM: {{ p.projectManagerName }}</span>
+      </div>
+
+      <div class="card-actions">
+        <a [routerLink]="['/projects', p.id]" class="btn-action btn-view">👁️ Chi tiết</a>
+        <button *hasPermission="'project:update'" (click)="openEditModal(p)" class="btn-action btn-edit">✏️ Sửa</button>
+        <button *hasPermission="'project:delete'" (click)="openDeleteModal(p)" class="btn-action btn-delete">🗑️ Xóa</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create / Edit Project Modal -->
+  <div *ngIf="showModal()" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>{{ isEditMode() ? 'Cập nhật Dự án' : 'Tạo Dự án Mới' }}</h3>
+        <button (click)="closeModal()" class="close-btn">✕</button>
+      </div>
+
+      <div *ngIf="formError()" class="alert alert-danger">
+        ⚠️ {{ formError() }}
+      </div>
+
+      <form [formGroup]="projectForm" (ngSubmit)="saveProject()" class="modal-body">
+        <div class="form-row">
+          <div class="form-group col">
+            <label>Mã dự án (Code) <span class="req">*</span></label>
+            <input type="text" formControlName="code" placeholder="VD: PRJ001" class="form-control" [readonly]="isEditMode()" />
+            <small *ngIf="projectForm.get('code')?.touched && projectForm.get('code')?.invalid" class="invalid">Mã dự án từ 3-20 ký tự</small>
+          </div>
+
+          <div class="form-group col">
+            <label>Tên dự án <span class="req">*</span></label>
+            <input type="text" formControlName="name" placeholder="VD: Website Ngân Hàng" class="form-control" />
+            <small *ngIf="projectForm.get('name')?.touched && projectForm.get('name')?.invalid" class="invalid">Tên dự án không quá 100 ký tự</small>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col">
+            <label>Khách hàng (Customer)</label>
+            <input type="text" formControlName="customerName" placeholder="VD: VietBank" class="form-control" />
+          </div>
+
+          <div class="form-group col">
+            <label>Quản lý dự án (PM)</label>
+            <select formControlName="projectManagerId" class="form-control">
+              <option value="">-- Chọn PM --</option>
+              <option *ngFor="let u of usersList()" [value]="u.id">{{ u.fullName || u.username }} ({{ u.email }})</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col">
+            <label>Ngày bắt đầu</label>
+            <input type="date" formControlName="startDate" class="form-control" />
+          </div>
+
+          <div class="form-group col">
+            <label>Ngày kết thúc</label>
+            <input type="date" formControlName="endDate" class="form-control" />
+          </div>
+        </div>
+
+        <div *ngIf="isEditMode()" class="form-group">
+          <label>Trạng thái</label>
+          <select formControlName="status" class="form-control">
+            <option value="PLANNING">Lập kế hoạch (PLANNING)</option>
+            <option value="ACTIVE">Đang hoạt động (ACTIVE)</option>
+            <option value="ON_HOLD">Tạm dừng (ON_HOLD)</option>
+            <option value="COMPLETED">Hoàn tất (COMPLETED)</option>
+            <option value="CANCELLED">Đã hủy (CANCELLED)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Mô tả dự án</label>
+          <textarea formControlName="description" rows="3" placeholder="Chi tiết phạm vi và mục tiêu..." class="form-control"></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" (click)="closeModal()" class="btn-secondary">Hủy</button>
+          <button type="submit" class="btn-primary" [disabled]="formSubmitting()">
+            <span *ngIf="!formSubmitting()">Lưu thông tin</span>
+            <span *ngIf="formSubmitting()">Đang xử lý...</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Delete Confirm Modal -->
+  <div *ngIf="showDeleteModal()" class="modal-backdrop">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <h3>Xác nhận xóa dự án</h3>
+        <button (click)="closeDeleteModal()" class="close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="delete-msg">{{ deleteMessage() }}</p>
+      </div>
+      <div class="modal-footer">
+        <button (click)="closeDeleteModal()" class="btn-secondary">Hủy</button>
+        <button (click)="confirmDelete()" class="btn-danger">
+          {{ needsDeleteConfirm() ? 'Xác nhận xóa tất cả' : 'Xóa mềm' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

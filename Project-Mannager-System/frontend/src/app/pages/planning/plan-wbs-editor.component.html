@@ -1,0 +1,252 @@
+<div class="wbs-editor">
+  <!-- Toolbar -->
+  <div class="wbs-toolbar">
+    <div>
+      <h3>WBS — Cấu trúc công việc</h3>
+      <p class="hint">Phase/Summary/WORK_PACKAGE có thể chứa task con; Task/MILESTONE/EXTERNAL là task lá.</p>
+    </div>
+    <button *hasPermission="'plan:update'" (click)="openAddRoot()" class="btn-primary">
+      ➕ Thêm task gốc
+    </button>
+  </div>
+
+  <!-- Loading -->
+  <div *ngIf="loading()" class="loading-state">
+    <div class="spinner"></div>
+    <p>Đang tải WBS...</p>
+  </div>
+
+  <!-- Error -->
+  <div *ngIf="error() && !loading()" class="error-state">
+    <p>⚠️ {{ error() }}</p>
+    <button (click)="loadTree()" class="btn-secondary">Thử lại</button>
+  </div>
+
+  <!-- Empty -->
+  <app-empty-state
+    *ngIf="!loading() && !error() && rows().length === 0"
+    title="WBS đang trống"
+    description="Thêm Phase/Task/Milestone để xây dựng cấu trúc kế hoạch (cần ≥ 1 task để gửi duyệt)."
+  >
+    <button *hasPermission="'plan:update'" (click)="openAddRoot()" class="btn-primary">Thêm task đầu tiên</button>
+  </app-empty-state>
+
+  <!-- Tree Table -->
+  <div *ngIf="!loading() && rows().length > 0" class="wbs-table">
+    <div class="wbs-table-header">
+      <span class="col-wbs">WBS</span>
+      <span class="col-name">Tên công việc</span>
+      <span class="col-type">Loại</span>
+      <span class="col-owner">Người thực hiện</span>
+      <span class="col-start">Bắt đầu</span>
+      <span class="col-finish">Kết thúc</span>
+      <span class="col-duration">Thời lượng</span>
+      <span class="col-effort">Effort</span>
+      <span class="col-progress">Tiến độ</span>
+      <span class="col-status">Trạng thái</span>
+      <span class="col-actions">Thao tác</span>
+    </div>
+
+    <div *ngFor="let row of rows()" class="wbs-row" [style.padding-left.px]="row.depth * 22">
+      <span class="col-wbs wbs-code">{{ row.task.wbsCode }}</span>
+
+      <span class="col-name task-name">
+        <button
+          *ngIf="row.hasChildren"
+          (click)="toggleExpand(row.task)"
+          class="expand-btn"
+          [title]="row.expanded ? 'Thu gọn' : 'Mở rộng'"
+        >{{ row.expanded ? '▼' : '▶' }}</button>
+        <span *ngIf="!row.hasChildren" class="expand-placeholder"></span>
+        {{ row.task.taskName }}
+        <span *ngIf="row.task.isMilestone" class="tag-milestone">🏁</span>
+        <span *ngIf="row.task.isCritical" class="tag-critical">⚠ critical</span>
+      </span>
+
+      <span class="col-type type-badge" [class.summary]="row.task.isSummary">{{ typeLabels[row.task.taskType] }}</span>
+
+      <span class="col-owner">{{ ownerName(row.task.ownerId) }}</span>
+
+      <span class="col-start">{{ row.task.plannedStart || '—' }}</span>
+      <span class="col-finish">{{ row.task.plannedFinish || '—' }}</span>
+      <span class="col-duration">{{ formatValueWithUnit(row.task.durationMinutes, row.task.durationUnit) }}</span>
+      <span class="col-effort">{{ formatValueWithUnit(row.task.plannedEffortMinutes, row.task.effortUnit) }}</span>
+
+      <span class="col-progress">
+        <span class="progress-wrap">
+          <span class="progress-bar-bg">
+            <span class="progress-bar-fill" [style.width.%]="row.task.percentComplete"></span>
+          </span>
+          <span class="progress-val">{{ row.task.percentComplete }}%</span>
+        </span>
+      </span>
+
+      <span class="col-status"><app-status-chip [status]="row.task.status"></app-status-chip></span>
+
+      <span class="col-actions">
+        <ng-container *hasPermission="'plan:update'">
+          <button
+            class="btn-move" [disabled]="busyTaskIds.has(row.task.id) || !canMoveUp(row.task)"
+            (click)="move(row.task, 'UP')" title="Lên trên">↑</button>
+          <button
+            class="btn-move" [disabled]="busyTaskIds.has(row.task.id) || !canMoveDown(row.task)"
+            (click)="move(row.task, 'DOWN')" title="Xuống dưới">↓</button>
+          <button
+            class="btn-move" [disabled]="busyTaskIds.has(row.task.id) || !canIndent(row.task)"
+            (click)="move(row.task, 'INDENT')" title="Thụt vào (thành con của task trên)">→</button>
+          <button
+            class="btn-move" [disabled]="busyTaskIds.has(row.task.id) || !canOutdent(row.task)"
+            (click)="move(row.task, 'OUTDENT')" title="Lùi ra (lên cấp cha)">←</button>
+          <button *ngIf="!isLeaf(row.task.taskType)" class="btn-row btn-add"
+            (click)="openAddChild(row.task)" title="Thêm task con">＋</button>
+          <button *ngIf="row.task.parentId !== undefined || row.depth > 0" class="btn-row btn-sibling"
+            (click)="openAddSibling(row.task)" title="Thêm task cùng cấp">+</button>
+          <button *ngIf="row.task.taskType === 'MILESTONE'" class="btn-row btn-child-plan"
+            (click)="createChildPlan(row.task)" title="Tạo kế hoạch con">➕ Kế hoạch con</button>
+          <button class="btn-row btn-edit" (click)="openEdit(row.task)" title="Sửa">✏️</button>
+          <button
+            class="btn-row btn-delete"
+            [disabled]="row.task.isSummary || busyTaskIds.has(row.task.id)"
+            [title]="row.task.isSummary ? 'Xóa hết task con trước' : 'Xóa'"
+            (click)="deleteTask(row.task)"
+          >🗑️</button>
+        </ng-container>
+      </span>
+    </div>
+  </div>
+
+  <!-- Create / Edit Task Modal -->
+  <div *ngIf="showModal()" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>{{ modalTitle }}</h3>
+        <button (click)="closeModal()" class="close-btn">✕</button>
+      </div>
+
+      <div *ngIf="formError()" class="alert-danger">
+        ⚠️ {{ formError() }}
+      </div>
+
+      <form [formGroup]="taskForm" (ngSubmit)="saveTask()" class="modal-body">
+        <div class="form-row">
+          <div class="form-group col">
+            <label>Loại task <span class="req">*</span></label>
+            <select formControlName="taskType" (change)="onTaskTypeChange()" class="form-control">
+              <option *ngFor="let t of summaryTypes" [value]="t">{{ typeLabels[t] }} (có thể có con)</option>
+              <option *ngFor="let t of leafTypes" [value]="t">{{ typeLabels[t] }}</option>
+            </select>
+          </div>
+
+          <div class="form-group col">
+            <label>Mã task <span class="req">*</span></label>
+            <input type="text" formControlName="taskCode" placeholder="VD: TASK-001" class="form-control" />
+            <small *ngIf="taskForm.get('taskCode')?.touched && taskForm.get('taskCode')?.invalid" class="invalid">Mã task ≤ 40 ký tự</small>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Tên công việc <span class="req">*</span></label>
+          <input type="text" formControlName="taskName" placeholder="VD: Thiết kế database" class="form-control" />
+          <small *ngIf="taskForm.get('taskName')?.touched && taskForm.get('taskName')?.invalid" class="invalid">Tên ≤ 200 ký tự</small>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col">
+            <label>Người thực hiện</label>
+            <select formControlName="ownerId" class="form-control">
+              <option value="">— Chưa gán —</option>
+              <option *ngFor="let u of usersList()" [value]="u.id">{{ u.fullName || u.username }}</option>
+            </select>
+          </div>
+          <div class="form-group col">
+            <label>Ngày bắt đầu</label>
+            <input type="date" formControlName="plannedStart" class="form-control" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col">
+            <label>Ngày kết thúc</label>
+            <input type="date" formControlName="plannedFinish" class="form-control" />
+          </div>
+        </div>
+
+        <div class="form-row" *ngIf="taskForm.get('taskType')?.value !== 'MILESTONE'">
+          <div class="form-group col">
+            <label>Thời lượng</label>
+            <input type="number" min="0" formControlName="durationVal" class="form-control" />
+          </div>
+          <div class="form-group col">
+            <label>Đơn vị thời lượng</label>
+            <select formControlName="durationUnit" class="form-control">
+              <option value="MINUTE">Phút</option>
+              <option value="HOUR">Giờ</option>
+              <option value="DAY">Ngày</option>
+              <option value="WEEK">Tuần</option>
+              <option value="MONTH">Tháng</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row" *ngIf="taskForm.get('taskType')?.value !== 'MILESTONE'">
+          <div class="form-group col">
+            <label>Effort (Công sức)</label>
+            <input type="number" min="0" formControlName="effortVal" class="form-control" />
+          </div>
+          <div class="form-group col">
+            <label>Đơn vị effort</label>
+            <select formControlName="effortUnit" class="form-control">
+              <option value="MINUTE">Phút</option>
+              <option value="HOUR">Giờ</option>
+              <option value="DAY">Ngày</option>
+              <option value="WEEK">Tuần</option>
+              <option value="MONTH">Tháng</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col">
+            <label>Tiến độ %</label>
+            <input type="number" min="0" max="100" formControlName="percentComplete" class="form-control" />
+          </div>
+          <div class="form-group col">
+            <label>Trạng thái</label>
+            <select formControlName="status" class="form-control">
+              <option *ngFor="let s of statusOptions" [value]="s">{{ statusLabel(s) }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col">
+            <label>Ưu tiên</label>
+            <select formControlName="priority" class="form-control">
+              <option *ngFor="let p of priorityOptions" [value]="p">{{ priorityLabel(p) }}</option>
+            </select>
+          </div>
+          <div class="form-group col">
+            <label>Lịch trình</label>
+            <select formControlName="scheduleMode" class="form-control">
+              <option value="AUTO">Tự động (AUTO)</option>
+              <option value="MANUAL">Thủ công (MANUAL)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Mô tả</label>
+          <textarea formControlName="description" rows="2" class="form-control"></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" (click)="closeModal()" class="btn-secondary">Hủy</button>
+          <button type="submit" class="btn-primary" [disabled]="formSubmitting()">
+            <span *ngIf="!formSubmitting()">Lưu task</span>
+            <span *ngIf="formSubmitting()">Đang xử lý...</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

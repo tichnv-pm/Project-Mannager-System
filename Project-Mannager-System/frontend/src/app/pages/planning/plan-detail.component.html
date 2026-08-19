@@ -1,0 +1,294 @@
+<div class="plan-detail-page">
+  <div class="back-link">
+    <a routerLink="/plans">← Quay lại danh sách kế hoạch</a>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading()" class="loading-state">
+    <div class="spinner"></div>
+    <p>Đang tải chi tiết kế hoạch...</p>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="error() && !loading()" class="error-state">
+    <p>⚠️ {{ error() }}</p>
+    <a routerLink="/plans" class="btn-primary">Quay lại</a>
+  </div>
+
+  <!-- Content -->
+  <div *ngIf="!loading() && plan()" class="detail-container">
+    <app-page-header [title]="plan()?.planName || ''" [subtitle]="'Mã kế hoạch: ' + plan()?.planCode">
+      <app-status-chip [status]="plan()?.status || ''"></app-status-chip>
+    </app-page-header>
+
+    <!-- Tabs Header -->
+    <div class="tabs-header">
+      <button class="tab-btn" [class.active]="activeTab === 'overview'" (click)="activeTab = 'overview'">
+        📌 Tổng quan
+      </button>
+      <button class="tab-btn" [class.active]="activeTab === 'wbs'" (click)="activeTab = 'wbs'">
+        📋 WBS Editor
+      </button>
+      <button class="tab-btn" [class.active]="activeTab === 'dependencies'" (click)="activeTab = 'dependencies'">
+        🔗 Liên kết Task
+      </button>
+      <button class="tab-btn" [class.active]="activeTab === 'calendar'" (click)="activeTab = 'calendar'">
+        📅 Lịch làm việc
+      </button>
+      <button class="tab-btn" [class.active]="activeTab === 'scheduling'" (click)="activeTab = 'scheduling'">
+        ⚙️ Lịch trình & Găng
+      </button>
+      <button class="tab-btn" [class.active]="activeTab === 'resource'" (click)="activeTab = 'resource'">
+        👥 Resource
+      </button>
+      <button class="tab-btn" [class.active]="activeTab === 'versions'" (click)="activeTab = 'versions'">
+        📦 Version & Baseline
+      </button>
+      <button class="tab-btn" [class.active]="activeTab === 'change'" (click)="activeTab = 'change'">
+        🔄 Change & Link
+      </button>
+      <button class="tab-btn" [class.active]="activeTab === 'gantt'" (click)="activeTab = 'gantt'">
+        📊 Gantt
+      </button>
+    </div>
+
+    <!-- Lifecycle Actions -->
+    <div class="lifecycle-bar" *ngIf="plan()?.status === 'DRAFT' || plan()?.status === 'SUBMITTED' || plan()?.status === 'APPROVED'">
+      <span class="hint">Vòng đời: DRAFT → SUBMITTED → APPROVED → ACTIVE</span>
+      <div class="lifecycle-buttons">
+        <ng-container *hasPermission="'plan:update'">
+          <button
+            *ngIf="plan()?.status === 'DRAFT'"
+            (click)="submitPlan()"
+            [disabled]="lifecycleBusy()"
+            class="btn-lifecycle btn-submit"
+          >🚀 Gửi duyệt</button>
+        </ng-container>
+        <ng-container *hasPermission="'plan:approve'">
+          <button
+            *ngIf="plan()?.status === 'SUBMITTED'"
+            (click)="approvePlan()"
+            [disabled]="lifecycleBusy()"
+            class="btn-lifecycle btn-approve"
+          >✔ Duyệt kế hoạch</button>
+          <button
+            *ngIf="plan()?.status === 'APPROVED'"
+            (click)="activatePlan()"
+            [disabled]="lifecycleBusy()"
+            class="btn-lifecycle btn-activate"
+          >▶ Kích hoạt</button>
+        </ng-container>
+      </div>
+    </div>
+
+    <!-- Tab 1: Overview -->
+    <div *ngIf="activeTab === 'overview'" class="overview-grid">
+      <div class="info-card">
+        <h3>Thông tin kế hoạch</h3>
+        <div class="info-list">
+          <div class="info-row">
+            <span class="label">Loại kế hoạch:</span>
+            <span class="val bold purple">{{ typeLabel(plan()?.planType || 'MASTER') }}</span>
+          </div>
+          <div class="info-row">
+            <span class="label">Dự án:</span>
+            <span class="val bold">{{ projectName() || '—' }}</span>
+          </div>
+          <div class="info-row">
+            <span class="label">Master Plan:</span>
+            <span class="val">
+              <a *ngIf="masterPlan()" [routerLink]="['/plans', masterPlan()?.id]" class="link">{{ masterPlan()?.planCode }} — {{ masterPlan()?.planName }}</a>
+              <span *ngIf="!masterPlan()">{{ plan()?.planType === 'MASTER' ? '— (bản thân là Master)' : '—' }}</span>
+            </span>
+          </div>
+          <div class="info-row">
+            <span class="label">Ngày bắt đầu:</span>
+            <span class="val">{{ plan()?.plannedStart || 'N/A' }}</span>
+          </div>
+          <div class="info-row">
+            <span class="label">Ngày kết thúc:</span>
+            <span class="val">{{ plan()?.plannedFinish || 'N/A' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-card">
+        <h3>Tiến độ & Phiên bản</h3>
+        <div class="progress-box">
+          <div class="p-header">
+            <span>Tiến độ</span>
+            <span class="p-val">{{ plan()?.progress }}%</span>
+          </div>
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" [style.width.%]="plan()?.progress"></div>
+          </div>
+        </div>
+
+        <div class="info-list margin-top">
+          <div class="info-row">
+            <span class="label">Phiên bản hiệu lực:</span>
+            <span class="val bold">{{ plan()?.activeVersionNo != null ? 'v' + plan()?.activeVersionNo : 'Chưa có' }}</span>
+          </div>
+          <div class="info-row">
+            <span class="label">Tổng thời lượng:</span>
+            <span class="val">{{ formatDuration(plan()?.durationMinutes) }}</span>
+          </div>
+          <div class="info-row">
+            <span class="label">Ngày tạo:</span>
+            <span class="val">{{ plan()?.createdAt | date:'dd/MM/yyyy HH:mm' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-card full-col">
+        <h3>Mô tả</h3>
+        <p class="desc-text">{{ plan()?.description || 'Không có mô tả cho kế hoạch này.' }}</p>
+      </div>
+
+      <!-- Detail Plans của Master -->
+      <div *ngIf="plan()?.planType === 'MASTER'" class="children-section">
+        <div class="section-header">
+          <h3>Detail Plans thuộc Master ({{ childPlans().length }})</h3>
+          <a *hasPermission="'plan:create'" [routerLink]="['/plans']" class="btn-secondary">➕ Tạo Detail Plan</a>
+        </div>
+
+        <app-empty-state
+          *ngIf="childPlans().length === 0"
+          title="Chưa có Detail Plan"
+          description="Tạo các Detail Plan (backend/frontend/testing...) thuộc Master này để chi tiết hóa WBS."
+        >
+          <a [routerLink]="['/plans']" class="btn-primary">Tạo Detail Plan</a>
+        </app-empty-state>
+
+        <div *ngIf="childPlans().length > 0" class="children-grid">
+          <div *ngFor="let c of childPlans()" class="child-card">
+            <div class="card-top">
+              <span class="code-badge">{{ c.planCode }}</span>
+              <app-status-chip [status]="c.status"></app-status-chip>
+            </div>
+            <h4 class="child-title">
+              <a [routerLink]="['/plans', c.id]">{{ c.planName }}</a>
+            </h4>
+            <div class="child-meta">
+              <span>📅 {{ c.plannedStart || '—' }} → {{ c.plannedFinish || '—' }}</span>
+              <span>{{ c.progress }}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action row -->
+      <div class="action-row">
+        <button *hasPermission="'plan:update'" (click)="openEditModal()" class="btn-primary">✏️ Cập nhật thông tin</button>
+        <button *hasPermission="'plan:delete'" (click)="openDeleteModal()" class="btn-danger">🗑️ Xóa kế hoạch</button>
+      </div>
+    </div>
+
+    <!-- Tab 2: WBS Editor -->
+    <div *ngIf="activeTab === 'wbs'" class="tab-wbs">
+      <app-plan-wbs-editor [planId]="plan()!.id" [projectId]="plan()?.projectId" (changed)="onWbsChanged()"></app-plan-wbs-editor>
+    </div>
+
+    <!-- Tab 3: Dependency Editor -->
+    <div *ngIf="activeTab === 'dependencies'" class="tab-deps">
+      <app-plan-dependency-editor [planId]="plan()!.id" (changed)="onWbsChanged()"></app-plan-dependency-editor>
+    </div>
+
+    <!-- Tab 4: Calendar -->
+    <div *ngIf="activeTab === 'calendar'" class="tab-calendar">
+      <app-plan-calendar [planId]="plan()!.id"></app-plan-calendar>
+    </div>
+
+    <!-- Tab 5: Scheduling & Critical Path -->
+    <div *ngIf="activeTab === 'scheduling'" class="tab-scheduling">
+      <app-plan-scheduling [planId]="plan()!.id" (changed)="onWbsChanged()"></app-plan-scheduling>
+    </div>
+
+    <!-- Tab 6: Resource & Workload -->
+    <div *ngIf="activeTab === 'resource'" class="tab-resource">
+      <app-plan-resource [planId]="plan()!.id" (changed)="onWbsChanged()"></app-plan-resource>
+    </div>
+
+    <!-- Tab 7: Version & Baseline -->
+    <div *ngIf="activeTab === 'versions'" class="tab-versions">
+      <app-plan-version-baseline
+        [planId]="plan()!.id"
+        [planStatus]="plan()?.status || ''"
+        (changed)="onWbsChanged()"
+      ></app-plan-version-baseline>
+    </div>
+
+    <!-- Tab 8: Change & Link -->
+    <div *ngIf="activeTab === 'change'" class="tab-change">
+      <app-plan-change [planId]="plan()!.id"></app-plan-change>
+    </div>
+
+    <!-- Tab 9: Gantt -->
+    <div *ngIf="activeTab === 'gantt'" class="tab-gantt">
+      <app-plan-gantt [planId]="plan()!.id"></app-plan-gantt>
+    </div>
+  </div>
+
+  <!-- Edit Modal -->
+  <div *ngIf="showEditModal()" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Cập nhật Kế hoạch</h3>
+        <button (click)="closeEditModal()" class="close-btn">✕</button>
+      </div>
+
+      <div *ngIf="formError()" class="alert alert-danger">
+        ⚠️ {{ formError() }}
+      </div>
+
+      <form [formGroup]="editForm" (ngSubmit)="savePlan()" class="modal-body">
+        <div class="form-group">
+          <label>Tên kế hoạch <span class="req">*</span></label>
+          <input type="text" formControlName="planName" class="form-control" />
+          <small *ngIf="editForm.get('planName')?.touched && editForm.get('planName')?.invalid" class="invalid">Tên kế hoạch không quá 200 ký tự</small>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col">
+            <label>Ngày bắt đầu</label>
+            <input type="date" formControlName="plannedStart" class="form-control" />
+          </div>
+          <div class="form-group col">
+            <label>Ngày kết thúc</label>
+            <input type="date" formControlName="plannedFinish" class="form-control" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Mô tả</label>
+          <textarea formControlName="description" rows="3" class="form-control"></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" (click)="closeEditModal()" class="btn-secondary">Hủy</button>
+          <button type="submit" class="btn-primary" [disabled]="formSubmitting()">
+            <span *ngIf="!formSubmitting()">Lưu thông tin</span>
+            <span *ngIf="formSubmitting()">Đang xử lý...</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Delete Confirm Modal -->
+  <div *ngIf="showDeleteModal()" class="modal-backdrop">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <h3>Xác nhận xóa kế hoạch</h3>
+        <button (click)="closeDeleteModal()" class="close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="delete-msg">{{ deleteMessage() }}</p>
+      </div>
+      <div class="modal-footer">
+        <button (click)="closeDeleteModal()" class="btn-secondary">Hủy</button>
+        <button (click)="confirmDelete()" class="btn-danger">Xóa mềm</button>
+      </div>
+    </div>
+  </div>
+</div>

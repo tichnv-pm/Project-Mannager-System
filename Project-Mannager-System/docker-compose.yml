@@ -1,0 +1,67 @@
+name: pmdaily
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pmdaily-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-pmdaily}
+      POSTGRES_USER: ${POSTGRES_USER:-pmdaily}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pmdaily}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pmdaily} -d ${POSTGRES_DB:-pmdaily}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - pmd-network
+
+  backend:
+    build:
+      context: ./backend
+    container_name: pmdaily-backend
+    environment:
+      DB_URL: ${DB_URL:-jdbc:postgresql://postgres:5432/pmdaily}
+      DB_USERNAME: ${DB_USERNAME:-pmdaily}
+      DB_PASSWORD: ${DB_PASSWORD:-pmdaily}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION:-900000}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800000}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:4200}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - pmd-network
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: pmdaily-frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - pmd-network
+
+volumes:
+  pgdata:
+
+networks:
+  pmd-network:
+    driver: bridge

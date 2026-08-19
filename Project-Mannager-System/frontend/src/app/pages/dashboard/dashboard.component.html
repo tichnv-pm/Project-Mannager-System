@@ -1,0 +1,208 @@
+<div class="dashboard-page">
+  <app-page-header title="Dashboard Tổng quan hằng ngày" subtitle="Nơi nắm toàn cảnh tình trạng công việc và dự án hằng ngày cho PM">
+    <button (click)="loadDashboardData()" class="btn-secondary">
+      🔄 Tải lại
+    </button>
+  </app-page-header>
+
+  <!-- Filter Toolbar -->
+  <div class="filter-toolbar">
+    <div class="filter-group">
+      <label for="projectSelect">Dự án:</label>
+      <select id="projectSelect" [(ngModel)]="selectedProjectId" (change)="onFilterChange()" class="form-control">
+        <option value="">-- Tất cả dự án --</option>
+        <option *ngFor="let p of projectsList()" [value]="p.id">
+          [{{ p.code }}] {{ p.name }}
+        </option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label for="fromDate">Từ ngày:</label>
+      <input id="fromDate" type="date" [(ngModel)]="fromDate" (change)="onFilterChange()" class="form-control" />
+    </div>
+
+    <div class="filter-group">
+      <label for="toDate">Đến ngày:</label>
+      <input id="toDate" type="date" [(ngModel)]="toDate" (change)="onFilterChange()" class="form-control" />
+    </div>
+
+    <button *ngIf="selectedProjectId || fromDate || toDate" (click)="resetFilter()" class="btn-text">
+      Xóa bộ lọc
+    </button>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading()" class="loading-container">
+    <div class="spinner"></div>
+    <p>Đang tải dữ liệu Dashboard...</p>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="error() && !loading()" class="error-container">
+    <div class="error-box">
+      <span class="error-icon">⚠️</span>
+      <p>{{ error() }}</p>
+      <button (click)="loadDashboardData()" class="btn-primary">Thử lại</button>
+    </div>
+  </div>
+
+  <!-- Main Dashboard Content -->
+  <div *ngIf="!loading() && !error() && summary()" class="dashboard-content">
+    <!-- 10 Stat Cards Grid -->
+    <div class="stat-grid">
+      <!-- 1. Total Tasks Today -->
+      <div class="stat-card">
+        <div class="stat-icon icon-blue">📋</div>
+        <div class="stat-info">
+          <span class="stat-value">{{ summary()?.totalTasksToday }}</span>
+          <span class="stat-label">Task hôm nay</span>
+        </div>
+      </div>
+
+      <!-- 2. Overdue Tasks -->
+      <div class="stat-card" [class.warning-danger]="(summary()?.overdueTasks || 0) > 0">
+        <div class="stat-icon icon-red">🚨</div>
+        <div class="stat-info">
+          <span class="stat-value">{{ summary()?.overdueTasks }}</span>
+          <span class="stat-label">Task quá hạn</span>
+        </div>
+      </div>
+
+      <!-- 3. Upcoming Tasks -->
+      <div class="stat-card">
+        <div class="stat-icon icon-indigo">📅</div>
+        <div class="stat-info">
+          <span class="stat-value">{{ summary()?.upcomingTasks }}</span>
+          <span class="stat-label">Sắp đến hạn (7 ngày)</span>
+        </div>
+      </div>
+
+      <!-- 4. In Progress Tasks -->
+      <div class="stat-card">
+        <div class="stat-icon icon-sky">🔄</div>
+        <div class="stat-info">
+          <span class="stat-value">{{ summary()?.inProgressTasks }}</span>
+          <span class="stat-label">Đang thực hiện</span>
+        </div>
+      </div>
+
+      <!-- 5. Blocked Tasks -->
+      <div class="stat-card" [class.warning-orange]="(summary()?.blockedTasks || 0) > 0">
+        <div class="stat-icon icon-amber">🚧</div>
+        <div class="stat-info">
+          <span class="stat-value">{{ summary()?.blockedTasks }}</span>
+          <span class="stat-label">Bị tắc nghẽn (Blocker)</span>
+        </div>
+      </div>
+
+      <!-- 6. Meetings Today -->
+      <div class="stat-card">
+        <div class="stat-icon icon-purple">🤝</div>
+        <div class="stat-info">
+          <span class="stat-value">{{ summary()?.meetingsToday }}</span>
+          <span class="stat-label">Cuộc họp hôm nay</span>
+        </div>
+      </div>
+
+      <!-- 7. Pending Action Items -->
+      <div class="stat-card">
+        <div class="stat-icon icon-teal">📝</div>
+        <div class="stat-info">
+          <span class="stat-value">{{ summary()?.pendingActionItems }}</span>
+          <span class="stat-label">Action Item chưa xong</span>
+        </div>
+      </div>
+
+      <!-- 8. High Risks -->
+      <div class="stat-card" [class.warning-danger]="(summary()?.highRisks || 0) > 0">
+        <div class="stat-icon icon-rose">⚠️</div>
+        <div class="stat-info">
+          <span class="stat-value">{{ summary()?.highRisks }}</span>
+          <span class="stat-label">Risk High / Critical</span>
+        </div>
+      </div>
+
+      <!-- 9. Open Issues -->
+      <div class="stat-card">
+        <div class="stat-icon icon-orange">🐛</div>
+        <div class="stat-info">
+          <span class="stat-value">{{ summary()?.openIssues }}</span>
+          <span class="stat-label">Issue đang mở</span>
+        </div>
+      </div>
+
+      <!-- 10. Upcoming Milestones -->
+      <div class="stat-card">
+        <div class="stat-icon icon-emerald">🚩</div>
+        <div class="stat-info">
+          <span class="stat-value">{{ summary()?.upcomingMilestones }}</span>
+          <span class="stat-label">Milestone (30 ngày)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts & Analytics Section -->
+    <div class="charts-row">
+      <!-- Tasks by Status Breakdown -->
+      <div class="dashboard-card">
+        <div class="card-header">
+          <h3>📊 Công việc theo Trạng thái</h3>
+        </div>
+        <div class="card-body">
+          <div *ngIf="taskStats()?.tasksByStatus?.length === 0" class="empty-text">Chưa có dữ liệu công việc</div>
+          <div *ngFor="let item of taskStats()?.tasksByStatus" class="progress-item">
+            <div class="progress-info">
+              <span class="item-name">{{ getStatusLabel(item.status) }}</span>
+              <span class="item-count">{{ item.count }} task ({{ getStatusPercentage(item.count) }}%)</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" [style.width.%]="getStatusPercentage(item.count)"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tasks by Priority Breakdown -->
+      <div class="dashboard-card">
+        <div class="card-header">
+          <h3>🔥 Công việc theo Mức độ ưu tiên</h3>
+        </div>
+        <div class="card-body">
+          <div *ngIf="taskStats()?.tasksByPriority?.length === 0" class="empty-text">Chưa có dữ liệu ưu tiên</div>
+          <div *ngFor="let item of taskStats()?.tasksByPriority" class="progress-item">
+            <div class="progress-info">
+              <span class="item-name">{{ getPriorityLabel(item.priority) }}</span>
+              <span class="item-count">{{ item.count }} task</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill prio-fill" [style.width.%]="getStatusPercentage(item.count)"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Projects Progress Breakdown -->
+      <div class="dashboard-card full-width">
+        <div class="card-header">
+          <h3>📁 Tiến độ các Dự án</h3>
+        </div>
+        <div class="card-body">
+          <div *ngIf="projectProgress()?.projects?.length === 0" class="empty-text">Chưa có dự án nào</div>
+          <div class="project-grid">
+            <div *ngFor="let prj of projectProgress()?.projects" class="project-card-item">
+              <div class="prj-header">
+                <span class="prj-code">{{ prj.code }}</span>
+                <span class="prj-progress-text">{{ prj.progress }}%</span>
+              </div>
+              <div class="prj-name">{{ prj.name }}</div>
+              <div class="progress-bar-bg">
+                <div class="progress-bar-fill prj-fill" [style.width.%]="prj.progress"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

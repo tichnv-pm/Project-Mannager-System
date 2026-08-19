@@ -1,0 +1,266 @@
+<div class="plan-calendar">
+  <div class="cal-toolbar">
+    <h3>📅 Lịch làm việc</h3>
+    <div class="cal-actions">
+      <ng-container *hasPermission="'plan:update'">
+        <button (click)="openManage()" class="btn-secondary btn-sm">🗂 Quản lý calendars</button>
+        <button (click)="openAddExceptionEffective()" class="btn-primary btn-sm">➕ Thêm exception</button>
+      </ng-container>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div *ngIf="loading()" class="loading-state">
+    <div class="spinner"></div>
+    <p>Đang tải lịch làm việc...</p>
+  </div>
+
+  <!-- Error -->
+  <div *ngIf="error() && !loading()" class="alert alert-danger">⚠️ {{ error() }}</div>
+
+  <!-- Effective calendar -->
+  <div *ngIf="!loading() && effective()" class="cal-body">
+    <div class="cal-info-card">
+      <div class="cal-info-row">
+        <span class="label">Calendar hiệu lực:</span>
+        <span class="val bold">{{ effective()?.name }}</span>
+        <span class="source-chip">{{ sourceLabel() }}</span>
+      </div>
+      <div class="cal-info-row">
+        <span class="label">Trạng thái:</span>
+        <span class="val">{{ statusLabels[effective()?.status || 'ACTIVE'] }}</span>
+      </div>
+      <div class="cal-info-row">
+        <span class="label">Số giờ làm việc/ngày:</span>
+        <span class="val">{{ effective()?.dailyWorkingHours ?? 8 }} giờ</span>
+      </div>
+      <div class="cal-info-row">
+        <span class="label">Múi giờ:</span>
+        <span class="val">{{ effective()?.timezone || 'N/A' }}</span>
+      </div>
+      <div class="cal-info-row" *ngIf="effective()?.description">
+        <span class="label">Mô tả:</span>
+        <span class="val">{{ effective()?.description }}</span>
+      </div>
+    </div>
+
+    <!-- Working days -->
+    <h4 class="section-title">Ngày làm việc trong tuần</h4>
+    <div class="wd-grid">
+      <div *ngFor="let d of dayKeys" class="wd-card" [class.wd-off]="!isWorkingDay(d)">
+        <div class="wd-day">{{ dayLabels[d] }}</div>
+        <div class="wd-status">
+          <span class="wd-badge" [class.badge-off]="!isWorkingDay(d)">
+            {{ isWorkingDay(d) ? 'Làm việc' : 'Nghỉ' }}
+          </span>
+        </div>
+        <div class="wd-time" *ngIf="isWorkingDay(d)">
+          {{ fmtTime(workingDayOf(d)?.startTime) }} – {{ fmtTime(workingDayOf(d)?.endTime) }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Exceptions -->
+    <h4 class="section-title">
+      Ngoại lệ (holiday / làm bù) —
+      <span>{{ sortExceptions(effective()!).length }}</span>
+    </h4>
+    <app-empty-state
+      *ngIf="sortExceptions(effective()!).length === 0"
+      title="Chưa có ngoại lệ"
+      description="Thêm ngày nghỉ lễ (NON_WORKING) hoặc ngày làm bù (WORKING) cho calendar."
+    >
+    </app-empty-state>
+    <div *ngIf="sortExceptions(effective()!).length > 0" class="exc-table-wrap">
+      <table class="exc-table">
+        <thead>
+          <tr>
+            <th>Ngày</th>
+            <th>Loại</th>
+            <th>Ghi chú</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let e of sortExceptions(effective()!)">
+            <td>{{ e.exceptionDate }}</td>
+            <td>
+              <span class="exc-badge" [class.badge-working]="e.exceptionType === 'WORKING'">
+                {{ excLabel(e.exceptionType) }}
+              </span>
+            </td>
+            <td>{{ e.note || '—' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ─── Manage calendars modal ───────────────────────────── -->
+  <div *ngIf="manageOpen()" class="modal-backdrop">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h3>Quản lý calendars</h3>
+        <button (click)="closeManage()" class="close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="manage-toolbar">
+          <span class="hint">Calendars tổ chức — chọn để gán cho plan hoặc tạo mới.</span>
+          <button *hasPermission="'plan:update'" (click)="openCreateCal()" class="btn-primary">➕ Tạo calendar</button>
+        </div>
+        <div *ngIf="manageBusy()" class="loading-state">
+          <div class="spinner"></div>
+          <p>Đang tải...</p>
+        </div>
+        <app-empty-state
+          *ngIf="!manageBusy() && calendars().length === 0"
+          title="Chưa có calendar"
+          description="Tạo calendar tổ chức để plan sử dụng cho việc tính lịch."
+        >
+        </app-empty-state>
+        <div *ngIf="!manageBusy() && calendars().length > 0" class="cal-list-wrap">
+          <table class="cal-table">
+            <thead>
+              <tr>
+                <th>Tên</th>
+                <th>Giờ/ngày</th>
+                <th>Timezone</th>
+                <th>Trạng thái</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of calendars()">
+                <td>
+                  <strong>{{ row.calendar.name }}</strong>
+                  <span *ngIf="row.isDirect" class="direct-chip">Đang dùng</span>
+                  <div class="cell-error" *ngIf="row.actionError">⚠️ {{ row.actionError }}</div>
+                </td>
+                <td>{{ row.calendar.dailyWorkingHours ?? 8 }}h</td>
+                <td>{{ row.calendar.timezone || '—' }}</td>
+                <td>
+                  <span class="status-chip-mini" [class.status-inactive]="row.calendar.status === 'INACTIVE'">
+                    {{ statusLabels[row.calendar.status] }}
+                  </span>
+                </td>
+                <td>
+                  <div *hasPermission="'plan:update'" class="row-actions">
+                    <button
+                      (click)="assignCal(row)"
+                      [disabled]="row.isDirect || manageBusy()"
+                      class="btn-secondary btn-xs"
+                      title="Gán calendar này cho plan"
+                    >Gán cho plan</button>
+                    <button (click)="openEditCal(row)" [disabled]="manageBusy()" class="btn-secondary btn-xs">✏️</button>
+                    <button
+                      (click)="openAddException(row.calendar)"
+                      [disabled]="manageBusy()"
+                      class="btn-secondary btn-xs"
+                      title="Thêm exception"
+                    >🏖️</button>
+                    <button (click)="deleteCal(row)" [disabled]="manageBusy()" class="btn-danger-soft btn-xs">🗑️</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Create/Edit calendar modal ────────────────────────── -->
+  <div *ngIf="showCalModal()" class="modal-backdrop">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h3>{{ isEditCal() ? 'Cập nhật calendar' : 'Tạo calendar mới' }}</h3>
+        <button (click)="closeCalModal()" class="close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div *ngIf="calFormError()" class="alert alert-danger">⚠️ {{ calFormError() }}</div>
+        <form [formGroup]="calForm" (ngSubmit)="saveCal()">
+          <div class="form-row">
+            <div class="form-group col">
+              <label>Tên calendar <span class="req">*</span></label>
+              <input type="text" formControlName="name" class="form-control" placeholder="VD: Lịch chuẩn VN" />
+            </div>
+            <div class="form-group col">
+              <label>Số giờ làm việc/ngày</label>
+              <input type="number" min="1" max="24" formControlName="dailyWorkingHours" class="form-control" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group col">
+              <label>Múi giờ</label>
+              <input type="text" formControlName="timezone" class="form-control" placeholder="Asia/Ho_Chi_Minh" />
+            </div>
+            <div class="form-group col" *ngIf="isEditCal()">
+              <label>Trạng thái</label>
+              <select formControlName="status" class="form-control">
+                <option *ngFor="let s of statusKeys" [value]="s">{{ statusLabels[s] }}</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Mô tả</label>
+            <textarea formControlName="description" rows="2" class="form-control"></textarea>
+          </div>
+
+          <h4 class="wd-edit-title">Ngày làm việc</h4>
+          <div class="wd-edit-grid">
+            <div *ngFor="let d of dayKeys" class="wd-edit-item" [class.item-off]="!isWorking(d)">
+              <label class="wd-toggle">
+                <input type="checkbox" [checked]="isWorking(d)" (change)="toggleDay(d)" />
+                <span>{{ dayLabels[d] }}</span>
+              </label>
+            </div>
+          </div>
+          <p class="hint-note">Bỏ chọn = ngày nghỉ (weekend). Scheduling engine dùng danh sách này để tính ngày làm việc thực tế.</p>
+
+          <div class="modal-footer">
+            <button type="button" (click)="closeCalModal()" class="btn-secondary">Hủy</button>
+            <button type="submit" class="btn-primary" [disabled]="calFormBusy()">
+              <span *ngIf="!calFormBusy()">{{ isEditCal() ? 'Lưu thay đổi' : 'Tạo calendar' }}</span>
+              <span *ngIf="calFormBusy()">Đang xử lý...</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Add exception modal ───────────────────────────────── -->
+  <div *ngIf="showExcModal()" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Thêm ngoại lệ</h3>
+        <button (click)="closeExcModal()" class="close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div *ngIf="excError()" class="alert alert-danger">⚠️ {{ excError() }}</div>
+        <form [formGroup]="excForm" (ngSubmit)="addException()">
+          <div class="form-group">
+            <label>Ngày <span class="req">*</span></label>
+            <input type="date" formControlName="exceptionDate" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label>Loại <span class="req">*</span></label>
+            <select formControlName="exceptionType" class="form-control">
+              <option *ngFor="let k of excTypeKeys" [value]="k">{{ excTypeLabels[k] }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Ghi chú</label>
+            <input type="text" formControlName="note" maxlength="200" class="form-control" placeholder="VD: Lễ Quốc khánh" />
+          </div>
+          <div class="modal-footer">
+            <button type="button" (click)="closeExcModal()" class="btn-secondary">Hủy</button>
+            <button type="submit" class="btn-primary" [disabled]="excBusy()">
+              <span *ngIf="!excBusy()">Thêm exception</span>
+              <span *ngIf="excBusy()">Đang xử lý...</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

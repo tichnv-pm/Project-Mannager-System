@@ -1,0 +1,203 @@
+<div class="finance-container">
+
+  <!-- Loading State -->
+  <div *ngIf="loading()" class="loading-state">
+    <div class="spinner"></div>
+    <p>Đang tải thông tin tài chính & EVM...</p>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="error() && !loading()" class="error-state">
+    <div class="error-icon">⚠️</div>
+    <p>{{ error() }}</p>
+  </div>
+
+  <!-- Main View -->
+  <div *ngIf="!loading() && !error()">
+
+    <!-- Header Actions -->
+    <div class="finance-header">
+      <h4>🛡️ Quản lý Tài chính & Đo lường EVM</h4>
+      <button *hasPermission="'financial:update'" (click)="recalculateEvm()" class="btn-primary" [disabled]="recalculating()">
+        <span *ngIf="!recalculating()">🔄 Chạy EVM Hôm nay</span>
+        <span *ngIf="recalculating()">Đang chạy...</span>
+      </button>
+    </div>
+
+    <!-- EVM Key Cards -->
+    <div class="evm-cards">
+      
+      <!-- CPI Card -->
+      <div class="evm-card">
+        <span class="card-label">Cost Performance Index (CPI)</span>
+        <div class="card-main-row">
+          <span class="card-value" [style.color]="getCpiColor(latestSnapshot()?.cpi || 1.0)">
+            {{ (latestSnapshot()?.cpi || 1.0) | number:'1.2-2' }}
+          </span>
+          <span class="indicator-dot" [style.background]="getCpiColor(latestSnapshot()?.cpi || 1.0)"></span>
+        </div>
+        <span class="card-sub">
+          <span *ngIf="(latestSnapshot()?.cpi || 1.0) >= 1.0" class="text-success">✔ Tối ưu chi phí</span>
+          <span *ngIf="(latestSnapshot()?.cpi || 1.0) < 1.0" class="text-danger">⚠️ Vượt ngân sách</span>
+        </span>
+      </div>
+
+      <!-- SPI Card -->
+      <div class="evm-card">
+        <span class="card-label">Schedule Performance Index (SPI)</span>
+        <div class="card-main-row">
+          <span class="card-value" [style.color]="getSpiColor(latestSnapshot()?.spi || 1.0)">
+            {{ (latestSnapshot()?.spi || 1.0) | number:'1.2-2' }}
+          </span>
+          <span class="indicator-dot" [style.background]="getSpiColor(latestSnapshot()?.spi || 1.0)"></span>
+        </div>
+        <span class="card-sub">
+          <span *ngIf="(latestSnapshot()?.spi || 1.0) >= 1.0" class="text-success">✔ Đúng/Vượt tiến độ</span>
+          <span *ngIf="(latestSnapshot()?.spi || 1.0) < 1.0" class="text-danger">⚠️ Chậm tiến độ</span>
+        </span>
+      </div>
+
+      <!-- Cost Overview Card -->
+      <div class="evm-card">
+        <span class="card-label">Tổng hợp giá trị (EVM)</span>
+        <div class="costs-summary">
+          <div class="cost-row">
+            <span class="lbl">PV (Planned Value):</span>
+            <span class="val">{{ (latestSnapshot()?.plannedValue || 0) | number:'1.0-2' }} USD</span>
+          </div>
+          <div class="cost-row">
+            <span class="lbl">EV (Earned Value):</span>
+            <span class="val color-ev">{{ (latestSnapshot()?.earnedValue || 0) | number:'1.0-2' }} USD</span>
+          </div>
+          <div class="cost-row">
+            <span class="lbl">AC (Actual Cost):</span>
+            <span class="val color-ac">{{ (latestSnapshot()?.actualCost || 0) | number:'1.0-2' }} USD</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Grid: Chart & Rates -->
+    <div class="finance-grid">
+
+      <!-- Left: SVG Trend Line Chart -->
+      <div class="chart-card">
+        <h5>📈 Biểu đồ xu hướng EVM</h5>
+        <div class="chart-wrapper">
+          <div *ngIf="snapshots().length === 0" class="empty-chart">
+            Chưa có đủ dữ liệu lịch sử để vẽ biểu đồ
+          </div>
+          
+          <svg *ngIf="snapshots().length > 0" viewBox="0 0 500 200" class="evm-svg-chart">
+            <!-- Grid Lines -->
+            <line x1="40" y1="35" x2="460" y2="35" stroke="rgba(255,255,255,0.05)" stroke-width="1" />
+            <line x1="40" y1="105" x2="460" y2="105" stroke="rgba(255,255,255,0.05)" stroke-width="1" />
+            <line x1="40" y1="175" x2="460" y2="175" stroke="rgba(255,255,255,0.1)" stroke-width="1" />
+            
+            <!-- Curves -->
+            <path [attr.d]="getPvPath()" fill="none" stroke="#64748b" stroke-width="2" stroke-dasharray="4" />
+            <path [attr.d]="getEvPath()" fill="none" stroke="#a855f7" stroke-width="3" />
+            <path [attr.d]="getAcPath()" fill="none" stroke="#ef4444" stroke-width="3" />
+
+            <!-- Points/Dots & Tooltips -->
+            <g *ngFor="let p of getPoints('pv')">
+              <circle [attr.cx]="p.x" [attr.cy]="p.y" r="3" fill="#64748b" />
+            </g>
+            <g *ngFor="let p of getPoints('ev')">
+              <circle [attr.cx]="p.x" [attr.cy]="p.y" r="4" fill="#a855f7" />
+            </g>
+            <g *ngFor="let p of getPoints('ac')">
+              <circle [attr.cx]="p.x" [attr.cy]="p.y" r="4" fill="#ef4444" />
+            </g>
+          </svg>
+        </div>
+
+        <!-- Legend -->
+        <div class="chart-legend" *ngIf="snapshots().length > 0">
+          <div class="legend-item"><span class="line-pv"></span> PV (Kế hoạch)</div>
+          <div class="legend-item"><span class="line-ev"></span> EV (Đạt được)</div>
+          <div class="legend-item"><span class="line-ac"></span> AC (Thực tế chi)</div>
+        </div>
+      </div>
+
+      <!-- Right: Hourly Rates Management -->
+      <div class="rates-card">
+        <h5>💰 Đơn giá nhân sự (USD/Giờ)</h5>
+        <div class="members-rates-list">
+          <div *ngFor="let m of members()" class="member-rate-row">
+            <div class="member-info">
+              <span class="m-name">{{ m.fullName }}</span>
+              <span class="m-username">@{{ m.username }} • <code class="m-role">{{ m.role }}</code></span>
+            </div>
+            
+            <!-- Rate Value / Edit Form -->
+            <div class="member-rate-actions">
+              
+              <!-- Plain View Mode -->
+              <div *ngIf="editingMemberId() !== m.memberId" class="rate-view">
+                <span class="rate-amount">{{ (m.hourlyRate || 0) | number:'1.0-2' }} USD/h</span>
+                <button *hasPermission="'financial:update'" (click)="startEditRate(m)" class="btn-edit-sm">✏️</button>
+              </div>
+
+              <!-- Inline Edit Mode -->
+              <div *ngIf="editingMemberId() === m.memberId" class="rate-edit">
+                <input type="number" [(ngModel)]="editRate" class="rate-input" min="0" />
+                <button (click)="saveRate(m.memberId)" class="btn-save-sm" [disabled]="updatingRate()">✔</button>
+                <button (click)="cancelEditRate()" class="btn-cancel-sm">✕</button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Bottom: Snapshots History Table -->
+    <div class="history-card margin-top-lg">
+      <h5>📊 Nhật ký lịch sử Snapshots EVM</h5>
+      <div class="table-responsive">
+        <table class="table evm-table">
+          <thead>
+            <tr>
+              <th>Ngày Snapshot</th>
+              <th>PV (Kế hoạch)</th>
+              <th>EV (Đạt được)</th>
+              <th>AC (Thực tế)</th>
+              <th>CV (Sai lệch chi phí)</th>
+              <th>SV (Sai lệch tiến độ)</th>
+              <th>CPI</th>
+              <th>SPI</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngIf="snapshots().length === 0">
+              <td colspan="8" class="text-center italic text-muted">Chưa có bản ghi snapshot nào</td>
+            </tr>
+            <tr *ngFor="let s of snapshots()">
+              <td>{{ s.snapshotDate | date:'dd/MM/yyyy' }}</td>
+              <td>{{ s.plannedValue | number:'1.0-2' }} USD</td>
+              <td>{{ s.earnedValue | number:'1.0-2' }} USD</td>
+              <td>{{ s.actualCost | number:'1.0-2' }} USD</td>
+              <td [class.negative]="s.costVariance < 0" [class.positive]="s.costVariance >= 0">
+                {{ s.costVariance | number:'1.0-2' }} USD
+              </td>
+              <td [class.negative]="s.scheduleVariance < 0" [class.positive]="s.scheduleVariance >= 0">
+                {{ s.scheduleVariance | number:'1.0-2' }} USD
+              </td>
+              <td [style.color]="getCpiColor(s.cpi)" class="bold">
+                {{ s.cpi | number:'1.2-2' }}
+              </td>
+              <td [style.color]="getSpiColor(s.spi)" class="bold">
+                {{ s.spi | number:'1.2-2' }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+</div>

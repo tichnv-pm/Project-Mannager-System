@@ -1,0 +1,328 @@
+<div class="qa-tab-container">
+  
+  <!-- Sub Navigation -->
+  <div class="qa-subtabs">
+    <button (click)="switchTab('cases')" class="tab-btn" [class.active]="activeTab() === 'cases'">
+      📋 Kịch bản kiểm thử (Test Cases)
+    </button>
+    <button (click)="switchTab('runs')" class="tab-btn" [class.active]="activeTab() === 'runs'">
+      🚀 Đợt kiểm thử (Test Runs)
+    </button>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading()" class="loading-state">
+    <div class="spinner"></div>
+    <p>Đang tải dữ liệu chất lượng QA...</p>
+  </div>
+
+  <!-- Main Workspace -->
+  <div *ngIf="!loading()" class="workspace-area">
+
+    <!-- ────────────────── TEST CASES TAB ────────────────── -->
+    <div *ngIf="activeTab() === 'cases'" class="cases-view">
+      <div class="tab-header-actions">
+        <h4>Danh sách Kịch bản kiểm thử</h4>
+        <button *hasPermission="'project:update'" (click)="openCreateCaseModal()" class="btn-primary">
+          ➕ Thêm TestCase mới
+        </button>
+      </div>
+
+      <div *ngIf="testCases().length === 0" class="empty-placeholder">
+        Chưa có kịch bản kiểm thử nào. Bấm nút phía trên để tạo kịch bản.
+      </div>
+
+      <table *ngIf="testCases().length > 0" class="qa-table">
+        <thead>
+          <tr>
+            <th>Tiêu đề kịch bản</th>
+            <th>Độ ưu tiên</th>
+            <th>Trạng thái</th>
+            <th>Số bước thực hiện</th>
+            <th>Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let tc of testCases()">
+            <td class="bold text-left">{{ tc.title }}</td>
+            <td>
+              <span class="prio-badge" [ngClass]="tc.priority.toLowerCase()">{{ tc.priority }}</span>
+            </td>
+            <td>
+              <span class="status-badge" [ngClass]="tc.status.toLowerCase()">{{ tc.status }}</span>
+            </td>
+            <td>{{ tc.steps ? tc.steps.length : 0 }} bước</td>
+            <td>
+              <button (click)="openEditCaseModal(tc)" class="btn-icon" title="Chỉnh sửa">✏️</button>
+              <button (click)="deleteTestCase(tc.id)" class="btn-icon delete" title="Xóa">🗑️</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ────────────────── TEST RUNS TAB ────────────────── -->
+    <div *ngIf="activeTab() === 'runs'" class="runs-view">
+      <div class="tab-header-actions">
+        <h4>Danh sách Đợt kiểm thử</h4>
+        <button *hasPermission="'project:update'" (click)="openCreateRunModal()" class="btn-primary">
+          ➕ Tạo đợt Test mới
+        </button>
+      </div>
+
+      <div *ngIf="testRuns().length === 0" class="empty-placeholder">
+        Chưa có đợt kiểm thử nào được ghi nhận.
+      </div>
+
+      <table *ngIf="testRuns().length > 0" class="qa-table">
+        <thead>
+          <tr>
+            <th>Tên đợt test</th>
+            <th>Trạng thái</th>
+            <th>Ngày khởi tạo</th>
+            <th>Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let run of testRuns()">
+            <td class="bold text-left">{{ run.name }}</td>
+            <td>
+              <span class="run-status-badge" [ngClass]="run.status.toLowerCase()">{{ run.status }}</span>
+            </td>
+            <td>{{ run.createdAt | date:'dd/MM/yyyy HH:mm' }}</td>
+            <td>
+              <button (click)="openExecModal(run)" class="btn-exec">
+                ⚡ Thực thi & Kết quả
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- ────────────────── CREATE/EDIT TESTCASE MODAL ────────────────── -->
+  <div *ngIf="showCaseModal()" class="modal-backdrop">
+    <div class="modal-card case-modal">
+      <div class="modal-header">
+        <h3>{{ isEditCase() ? 'Cập nhật' : 'Tạo mới' }} kịch bản kiểm thử</h3>
+        <button (click)="showCaseModal.set(false)" class="close-btn">✕</button>
+      </div>
+
+      <form [formGroup]="testCaseForm" (ngSubmit)="saveTestCase()" class="modal-body scroll-body">
+        <div class="form-group">
+          <label>Tiêu đề kịch bản <span class="req">*</span></label>
+          <input type="text" formControlName="title" class="form-control" placeholder="Ví dụ: Kiểm tra đăng nhập với mật khẩu sai">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col">
+            <label>Độ ưu tiên</label>
+            <select formControlName="priority" class="form-control">
+              <option value="LOW">LOW</option>
+              <option value="MEDIUM">MEDIUM</option>
+              <option value="HIGH">HIGH</option>
+              <option value="CRITICAL">CRITICAL</option>
+            </select>
+          </div>
+          <div class="form-group col">
+            <label>Trạng thái</label>
+            <select formControlName="status" class="form-control">
+              <option value="DRAFT">DRAFT</option>
+              <option value="ACTIVE">ACTIVE</option>
+              <option value="RETIRED">RETIRED</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Mô tả kịch bản</label>
+          <textarea formControlName="description" class="form-control" rows="2"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Tiền đề (Preconditions)</label>
+          <textarea formControlName="preconditions" class="form-control" rows="2" placeholder="Ví dụ: Người dùng đã truy cập trang đăng nhập"></textarea>
+        </div>
+
+        <!-- Steps Section -->
+        <div class="steps-section">
+          <div class="steps-header">
+            <h5>Các bước thực hiện kiểm thử</h5>
+            <button type="button" (click)="addStep()" class="btn-secondary btn-sm">➕ Thêm bước</button>
+          </div>
+
+          <div formArrayName="steps" class="steps-list">
+            <div *ngFor="let step of steps.controls; let i=index" [formGroupName]="i" class="step-form-item">
+              <div class="step-num-del">
+                <span class="step-num-badge">Bước {{ i + 1 }}</span>
+                <button type="button" (click)="removeStep(i)" class="btn-del-step" *ngIf="steps.length > 1">✕</button>
+              </div>
+              
+              <div class="step-fields">
+                <div class="form-group">
+                  <label>Thao tác (Action)</label>
+                  <input type="text" formControlName="action" class="form-control input-sm" placeholder="Ví dụ: Nhập email abc@gmail.com và mật khẩu 123">
+                </div>
+                <div class="form-group font-expected">
+                  <label>Kết quả mong đợi (Expected Result)</label>
+                  <input type="text" formControlName="expectedResult" class="form-control input-sm" placeholder="Ví dụ: Hệ thống hiển thị thông báo lỗi 'Mật khẩu sai'">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" (click)="showCaseModal.set(false)" class="btn-secondary">Hủy</button>
+          <button type="submit" class="btn-primary" [disabled]="formSubmitting()">
+            Lưu kịch bản
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ────────────────── CREATE TEST RUN MODAL ────────────────── -->
+  <div *ngIf="showRunModal()" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Tạo đợt kiểm thử mới</h3>
+        <button (click)="showRunModal.set(false)" class="close-btn">✕</button>
+      </div>
+
+      <div *ngIf="formError()" class="alert alert-danger">
+        ⚠️ {{ formError() }}
+      </div>
+
+      <form [formGroup]="testRunForm" (ngSubmit)="createTestRun()" class="modal-body scroll-body">
+        <div class="form-group">
+          <label>Tên đợt test <span class="req">*</span></label>
+          <input type="text" formControlName="name" class="form-control" placeholder="Ví dụ: Test cycle - Sprint 1">
+        </div>
+
+        <div class="form-group">
+          <label>Mô tả chi tiết</label>
+          <textarea formControlName="description" class="form-control" rows="2"></textarea>
+        </div>
+
+        <!-- TestCase Checklist -->
+        <div class="tc-checklist-group">
+          <label class="bold">Chọn kịch bản kiểm thử gán vào đợt test này:</label>
+          <div class="tc-checklist">
+            <div *ngFor="let tc of testCases()" class="tc-check-item">
+              <input 
+                type="checkbox" 
+                [id]="'tc-' + tc.id" 
+                (change)="toggleTestCaseSelection(tc.id)"
+                [checked]="selectedCaseIds().includes(tc.id)"
+              >
+              <label [for]="'tc-' + tc.id">
+                <span class="prio-tag" [ngClass]="tc.priority.toLowerCase()">{{ tc.priority }}</span>
+                {{ tc.title }}
+              </label>
+            </div>
+            <div *ngIf="testCases().length === 0" class="no-tc-warning">
+              Không có kịch bản hoạt động nào để chọn. Hãy tạo TestCase trước!
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" (click)="showRunModal.set(false)" class="btn-secondary">Hủy</button>
+          <button type="submit" class="btn-primary" [disabled]="formSubmitting() || testCases().length === 0">
+            Tạo đợt Test
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ────────────────── EXECUTE TEST RUN MODAL ────────────────── -->
+  <div *ngIf="showExecModal()" class="modal-backdrop">
+    <div class="modal-card exec-modal-card">
+      <div class="modal-header">
+        <h3>Thực thi đợt kiểm thử: {{ selectedRun()?.name }}</h3>
+        <button (click)="showExecModal.set(false)" class="close-btn">✕</button>
+      </div>
+
+      <div class="modal-body exec-layout">
+        
+        <!-- Left: Case list in run -->
+        <div class="exec-cases-list">
+          <h5>Kịch bản trong đợt test</h5>
+          <div class="results-list">
+            <div 
+              *ngFor="let res of runResults()" 
+              (click)="selectForExecution(res)"
+              class="result-item-card"
+              [class.active]="executingResult()?.id === res.id"
+            >
+              <span class="status-indicator" [ngClass]="res.status.toLowerCase()"></span>
+              <div class="result-info">
+                <div class="tc-title bold">{{ res.testCaseTitle }}</div>
+                <div class="executor-name" *ngIf="res.executedByName">👤 Người chạy: {{ res.executedByName }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Execution details & Form -->
+        <div class="exec-form-panel">
+          <div *ngIf="!executingResult()" class="select-prompt">
+            👈 Hãy chọn một kịch bản kiểm thử bên trái để tiến hành thực thi và cập nhật kết quả.
+          </div>
+
+          <div *ngIf="executingResult()" class="exec-panel-content">
+            <h4>{{ executingResult()?.testCaseTitle }}</h4>
+            
+            <div class="result-status-log" *ngIf="executingResult()?.status !== 'UNTESTED'">
+              Trạng thái hiện tại: 
+              <span class="status-indicator" [ngClass]="executingResult()?.status?.toLowerCase() || ''"></span> 
+              <strong>{{ executingResult()?.status }}</strong>
+            </div>
+
+            <!-- Auto Bug Link if FAILED -->
+            <div *ngIf="executingResult()?.status === 'FAILED' && executingResult()?.bugIssueCode" class="auto-bug-card">
+              ⚠️ <strong>Lỗi được ghi nhận tự động:</strong>
+              <p>Hệ thống đã tự động tạo một Issue Bug cho dự án.</p>
+              <div class="bug-code-badge">🐛 Mã lỗi: {{ executingResult()?.bugIssueCode }}</div>
+            </div>
+
+            <hr>
+
+            <!-- Execution Form -->
+            <form [formGroup]="execForm" (ngSubmit)="saveExecutionResult()" class="exec-form">
+              <div class="form-group">
+                <label class="bold">Kết quả kiểm thử <span class="req">*</span></label>
+                <div class="status-options">
+                  <label class="status-opt passed">
+                    <input type="radio" value="PASSED" formControlName="status"> PASSED
+                  </label>
+                  <label class="status-opt failed">
+                    <input type="radio" value="FAILED" formControlName="status"> FAILED
+                  </label>
+                  <label class="status-opt blocked">
+                    <input type="radio" value="BLOCKED" formControlName="status"> BLOCKED
+                  </label>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="bold">Kết quả thực tế / Nhật ký ghi nhận <span class="req">*</span></label>
+                <textarea formControlName="actualResult" class="form-control" rows="4" placeholder="Nhập kết quả chạy thực tế, chi tiết lỗi nếu có..."></textarea>
+              </div>
+
+              <button type="submit" class="btn-primary w-100">
+                💾 Lưu kết quả kiểm thử
+              </button>
+            </form>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>

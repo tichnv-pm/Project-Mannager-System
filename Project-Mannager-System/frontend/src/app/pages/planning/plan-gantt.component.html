@@ -1,0 +1,259 @@
+<div class="gantt-container">
+  <!-- Toolbar -->
+  <div class="gantt-toolbar">
+    <div class="toolbar-left">
+      <div class="zoom-group">
+        <span class="label">Zoom:</span>
+        <button
+          class="btn-zoom"
+          [class.active]="zoom() === 'DAY'"
+          (click)="setZoom('DAY')"
+        >Ngày</button>
+        <button
+          class="btn-zoom"
+          [class.active]="zoom() === 'WEEK'"
+          (click)="setZoom('WEEK')"
+        >Tuần</button>
+        <button
+          class="btn-zoom"
+          [class.active]="zoom() === 'MONTH'"
+          (click)="setZoom('MONTH')"
+        >Tháng</button>
+      </div>
+
+      <div class="toggle-group">
+        <label class="toggle-item">
+          <input
+            type="checkbox"
+            [checked]="showCriticalHighlight()"
+            (change)="showCriticalHighlight.set(!showCriticalHighlight())"
+          />
+          <span class="toggle-label critical">🔴 Highlight Đường găng</span>
+        </label>
+        <label class="toggle-item">
+          <input
+            type="checkbox"
+            [checked]="showBaselineOverlay()"
+            (change)="showBaselineOverlay.set(!showBaselineOverlay())"
+          />
+          <span class="toggle-label baseline">📐 Đường cơ sở (Baseline)</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="toolbar-right">
+      <div class="search-box">
+        <input
+          type="text"
+          placeholder="Lọc tên task / wbsCode..."
+          [value]="keyword()"
+          (input)="keyword.set($any($event.target).value)"
+        />
+      </div>
+      <button class="btn-refresh" (click)="loadGanttData()">🔄 Tải lại</button>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading()" class="gantt-loading">
+    <div class="spinner"></div>
+    <p>Đang tải dữ liệu biểu đồ Gantt...</p>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="error() && !loading()" class="gantt-error">
+    <p>⚠️ {{ error() }}</p>
+    <button (click)="loadGanttData()" class="btn-retry">Thử lại</button>
+  </div>
+
+  <!-- Content Split View -->
+  <div *ngIf="!loading() && !error()" class="gantt-split-view">
+    <!-- Left Pane: WBS Grid Table -->
+    <div class="gantt-grid-pane">
+      <div class="grid-header">
+        <div class="col col-wbs">WBS</div>
+        <div class="col col-name">Tên công việc</div>
+        <div class="col col-type">Loại</div>
+        <div class="col col-progress">Tiến độ</div>
+      </div>
+
+      <div class="grid-body">
+        <div
+          *ngFor="let t of filteredTasks(); let i = index"
+          class="grid-row"
+          [class.row-critical]="t.isCritical && showCriticalHighlight()"
+          [style.height.px]="ROW_HEIGHT"
+        >
+          <div class="col col-wbs font-mono">{{ t.wbsCode }}</div>
+          <div class="col col-name" [style.padding-left.px]="(t.wbsCode.split('.').length - 1) * 12 + 8">
+            <span *ngIf="t.isCritical && showCriticalHighlight()" class="critical-dot">🔴</span>
+            <span class="task-name" [title]="t.taskName">{{ t.taskName }}</span>
+          </div>
+          <div class="col col-type">
+            <span class="type-badge" [class]="t.taskType.toLowerCase()">{{ typeLabel(t.taskType) }}</span>
+          </div>
+          <div class="col col-progress">
+            <div class="progress-bar-sm">
+              <div class="fill" [style.width.%]="t.percentComplete"></div>
+            </div>
+            <span class="pct-text">{{ t.percentComplete }}%</span>
+          </div>
+        </div>
+
+        <div *ngIf="filteredTasks().length === 0" class="empty-grid">
+          Không có công việc phù hợp
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Pane: SVG Timeline Viewport -->
+    <div class="gantt-timeline-pane">
+      <div class="timeline-scroll-wrapper">
+        <svg
+          [attr.width]="svgWidth()"
+          [attr.height]="svgHeight()"
+          class="gantt-svg"
+        >
+          <!-- SVG Definitions for Markers -->
+          <defs>
+            <marker
+              id="arrow-head"
+              viewBox="0 0 10 10"
+              refX="6"
+              refY="5"
+              markerWidth="6"
+              markerHeight="6"
+              orient="auto-start-reverse"
+            >
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#6366f1" />
+            </marker>
+          </defs>
+
+          <!-- Timeline Header Row & Weekend Background Columns -->
+          <g class="timeline-header-group">
+            <ng-container *ngFor="let h of timelineHeaders(); let colIdx = index">
+              <!-- Weekend column shading -->
+              <rect
+                *ngIf="h.isWeekend"
+                [attr.x]="colIdx * columnWidth()"
+                [attr.y]="HEADER_HEIGHT"
+                [attr.width]="columnWidth()"
+                [attr.height]="svgHeight() - HEADER_HEIGHT"
+                class="weekend-rect"
+              />
+              <!-- Header cell border & text -->
+              <rect
+                [attr.x]="colIdx * columnWidth()"
+                y="0"
+                [attr.width]="columnWidth()"
+                [attr.height]="HEADER_HEIGHT"
+                class="header-cell-rect"
+              />
+              <text
+                [attr.x]="colIdx * columnWidth() + columnWidth() / 2"
+                y="28"
+                text-anchor="middle"
+                class="header-text"
+              >{{ h.label }}</text>
+            </ng-container>
+          </g>
+
+          <!-- Grid Horizontal Row Lines -->
+          <g class="grid-row-lines">
+            <line
+              *ngFor="let t of filteredTasks(); let idx = index"
+              x1="0"
+              [attr.y1]="HEADER_HEIGHT + (idx + 1) * ROW_HEIGHT"
+              [attr.x2]="svgWidth()"
+              [attr.y2]="HEADER_HEIGHT + (idx + 1) * ROW_HEIGHT"
+              class="row-line"
+            />
+          </g>
+
+          <!-- Baseline Overlay Bars (drawn below main bars) -->
+          <g *ngIf="showBaselineOverlay()" class="baseline-bars-group">
+            <ng-container *ngFor="let b of calculatedBars()">
+              <rect
+                *ngIf="b.baselineX !== undefined && b.baselineWidth !== undefined"
+                [attr.x]="b.baselineX"
+                [attr.y]="b.y + b.height + 2"
+                [attr.width]="b.baselineWidth"
+                height="6"
+                rx="2"
+                class="baseline-overlay-bar"
+              >
+                <title>Baseline: {{ b.task.baseline?.start }} ~ {{ b.task.baseline?.finish }}</title>
+              </rect>
+            </ng-container>
+          </g>
+
+          <!-- Dependency Arrow Connectors -->
+          <g class="dependency-arrows-group">
+            <path
+              *ngFor="let arrow of calculatedArrows()"
+              [attr.d]="arrow.pathD"
+              marker-end="url(#arrow-head)"
+              class="dependency-path"
+            />
+          </g>
+
+          <!-- Task Bars & Shapes -->
+          <g class="task-bars-group">
+            <g
+              *ngFor="let b of calculatedBars()"
+              class="task-bar-item"
+              [class.critical-bar]="b.isCritical && showCriticalHighlight()"
+            >
+              <!-- Milestone Shape (Diamond) -->
+              <polygon
+                *ngIf="b.isMilestone"
+                [attr.points]="(b.x) + ',' + (b.y + 8) + ' ' + (b.x + 8) + ',' + (b.y) + ' ' + (b.x + 16) + ',' + (b.y + 8) + ' ' + (b.x + 8) + ',' + (b.y + 16)"
+                class="milestone-diamond"
+              >
+                <title>{{ b.task.taskName }} (Mốc: {{ b.task.start }})</title>
+              </polygon>
+
+              <!-- Summary Task Shape (Phase / Work Package Bracket) -->
+              <path
+                *ngIf="b.isSummary && !b.isMilestone"
+                [attr.d]="'M ' + b.x + ' ' + (b.y + 12) + ' L ' + b.x + ' ' + b.y + ' H ' + (b.x + b.width) + ' V ' + (b.y + 12) + ' L ' + (b.x + b.width - 4) + ' ' + (b.y + 6) + ' H ' + (b.x + 4) + ' Z'"
+                class="summary-bracket"
+              >
+                <title>{{ b.task.taskName }} ({{ b.task.percentComplete }}%)</title>
+              </path>
+
+              <!-- Standard Task Bar -->
+              <ng-container *ngIf="!b.isMilestone && !b.isSummary">
+                <!-- Background Bar -->
+                <rect
+                  [attr.x]="b.x"
+                  [attr.y]="b.y"
+                  [attr.width]="b.width"
+                  [attr.height]="b.height"
+                  rx="4"
+                  class="task-rect-bg"
+                />
+                <!-- Progress Bar -->
+                <rect
+                  [attr.x]="b.x"
+                  [attr.y]="b.y"
+                  [attr.width]="b.progressWidth"
+                  [attr.height]="b.height"
+                  rx="4"
+                  class="task-rect-progress"
+                />
+                <!-- Task Bar Label -->
+                <text
+                  [attr.x]="b.x + 6"
+                  [attr.y]="b.y + 14"
+                  class="bar-label-text"
+                >{{ b.task.taskName }}</text>
+                <title>{{ b.task.taskName }} ({{ b.task.percentComplete }}% - {{ b.task.start }} ~ {{ b.task.finish }})</title>
+              </ng-container>
+            </g>
+          </g>
+        </svg>
+      </div>
+    </div>
+  </div>
+</div>
