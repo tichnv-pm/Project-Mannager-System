@@ -1,16 +1,18 @@
-# PM Daily — Kế hoạch & Kết quả kiểm thử (v1.0.0)
+# PM Daily — Kế hoạch & Kết quả kiểm thử (v1.2.0)
 
-> Nguồn: Prompt 23 (Release), `docs/00-project-overview.md` mục 11, `docs/06-acceptance-criteria.md`.
-> Cập nhật: 2026-08-03.
+> Nguồn: `docs/00-project-overview.md` mục 11, `docs/06-acceptance-criteria.md`, và kết quả thực tế.
+> Cập nhật: 2026-08-22 (v1.2.0 — PHÁT HÀNH HOÀN CHỈNH v1.1 & v1.2).
 
 ## 1. Phạm vi
 
-Kiểm thử toàn diện trước khi phát hành v1.0.0 cho PM Daily Work Management:
+Kiểm thử toàn diện trước khi phát hành v1.2.0 cho PM Daily Work Management:
 
 - **Đơn vị (unit)**: Service, Utility, Mapper phía Backend.
-- **Tích hợp (integration)**: API REST toàn bộ 15 module nghiệp vụ (MockMvc + H2).
-- **Frontend**: Test unit cho service tầng dữ liệu (Vitest + HttpTestingController) + build production.
-- **Smoke test E2E**: Toàn bộ stack chạy qua Docker Compose (PostgreSQL + Backend + Nginx/Frontend), kiểm chứng bằng HTTP thực tế.
+- **Tích hợp (integration)**: API REST toàn bộ các module nghiệp vụ của v1.0, v1.1 (Planning) và v1.2 (Agile/Sprints, Wiki, QA, Git, EVM).
+- **Frontend**: Test unit cho các service tầng dữ liệu (Vitest + HttpTestingController) + build production.
+- **Tự động hóa E2E**: Thiết lập framework Playwright và viết kịch bản test E2E cho các luồng Lập kế hoạch, Agile/Sprints + Git, và QA + Tài chính EVM.
+- **Smoke test E2E**: Kiểm chứng toàn bộ stack qua Docker Compose (PostgreSQL + Backend + Nginx/Frontend), kiểm chứng bằng HTTP thực tế.
+- **Kiểm chứng hiệu năng (Performance)**: Đo đạc thời gian tính toán lập lịch (Scheduling recalc) và lấy dữ liệu Gantt SVG với quy mô 500 tasks.
 
 ## 2. Môi trường kiểm thử
 
@@ -20,7 +22,9 @@ Kiểm thử toàn diện trước khi phát hành v1.0.0 cho PM Daily Work Mana
 | JDK | OpenJDK 21.0.12 LTS | Backend |
 | Maven | 3.9.16 | Build backend |
 | Node.js | v24.18.1 | Frontend |
-| Angular CLI | 22.x (zoneless, standalone, Vitest) | Frontend |
+| NPM | 11.16.0 | Quản lý package |
+| Angular CLI | 22.x (zoneless, Vitest) | Frontend |
+| Playwright | ^1.46.0 | E2E Framework |
 | Docker Desktop | 29.6.2 (engine 29.6.2), Compose v5.3.1 | Runtime chính thức |
 | PostgreSQL | 16-alpine (container) | DB production-like |
 
@@ -28,121 +32,65 @@ Cổng sử dụng: `5432` (PostgreSQL), `8080` (Backend), `4200` (Nginx → Fro
 
 ## 3. Chiến lược kiểm thử
 
-- Backend: unit test (Mockito, không cần DB) + integration test (Spring Boot Test + H2 + MockMvc, profile `test`, seed riêng).
-- Frontend: Vitest qua `@angular/build:unit-test` (lệnh `npm test`, không watch), service tests dùng `provideHttpClientTesting`.
-- Build: `mvn clean package` (backend) và `npm run build` (frontend — kiểm tra type-check + AOT + budget).
+- Backend: unit test + integration test (Spring Boot Test + H2 + MockMvc, profile `test`, seed riêng).
+- Frontend: Vitest qua `@angular/build:unit-test` (lệnh `npm test`, không watch).
+- Build: `mvn clean package` (backend) và `npm run build` (frontend — kiểm tra type-check + SCSS budget).
+- E2E Playwright: Chạy qua Playwright test runner trỏ trực tiếp vào `http://localhost:4200` (môi trường Docker Compose).
 - Smoke E2E: `docker compose up -d --build` → gọi HTTP qua Nginx proxy (port 4200) như người dùng thật.
 
 ## 4. Kết quả Backend — `mvn clean test`
 
-**Tổng: 216 tests, 0 failures, 0 errors** (2026-08-03).
+**Tổng: 295 tests, 0 failures, 0 errors** (2026-08-22).
 
 | Nhóm kiểm thử | Số test | Kết quả |
 |---|---|---|
-| `AuthServiceTest` (unit) | 16 | PASS |
-| `AuthIntegrationTest` | 16 | PASS |
-| `TaskIntegrationTest` | 47 | PASS |
-| `ProjectIntegrationTest` | 28 | PASS |
-| `MeetingIntegrationTest` | 30 | PASS |
-| `ActionItemIntegrationTest` | 27 | PASS |
-| `UserAdminIntegrationTest` *(Prompt 22)* | 16 | PASS |
-| `JwtServiceTest` (unit) | 6 | PASS |
-| `AuditDataSanitizerTest` (unit) | 5 | PASS |
-| `SecuritySmokeIntegrationTest` | 4 | PASS |
-| `GlobalExceptionHandlerTest` (unit) | 8 | PASS |
-| `ErrorCodeTest` (unit) | 2 | PASS |
-| `DashboardIntegrationTest` | 1 | PASS |
-| `ReportIntegrationTest` | 1 | PASS |
-| `AuditLogIntegrationTest` | 1 | PASS |
-| `RiskIntegrationTest` | 2 | PASS |
-| `IssueIntegrationTest` | 2 | PASS |
-| `MilestoneIntegrationTest` | 1 | PASS |
-| `NotificationIntegrationTest` | 2 | PASS |
-| `PMDailyApplicationTests` (smoke context) | 1 | PASS |
+| Phân hệ v1.0.0 (Auth, Task, Project, Meeting, v.v.) | 222 | PASS |
+| Phân hệ v1.1.0 (Plan, Task/WBS, Dependency, Calendar) | 56 | PASS |
+| Phân hệ v1.2.0 (Agile/Sprints, Wiki, QA, Git, EVM Finance) | 17 | PASS |
 
-Phạm vi kiểm thử quan trọng đã phủ:
-
-- Auth: login lock 5 lần/5 phút, refresh rotation + reuse detection, logout idempotent, change/reset password.
-- Task: state machine 6 trạng thái, mã tự sinh concurrent, phân quyền theo role, export Excel.
-- Meeting/ActionItem: participants, attachments, complete khóa biên bản, convert action item → task.
-- UserAdmin: create/update/status với optimistic locking (version), phân quyền `user:view/manage`, `role:manage`, chống self-deactivate, chống gỡ quyền `role:manage` khỏi ADMIN.
-- Security: 401/403, inactive user bị chặn, JWT hết hạn, phương thức HTTP không cho phép.
+Phạm vi kiểm thử quan trọng đã phủ ở v1.2.0:
+- Sprints: Vòng đời Sprint (FUTURE -> ACTIVE -> CLOSED), phân bổ backlog, chặn ngày kết thúc vượt sprint.
+- Wiki: Khởi tạo Wiki theo templates, lưu lịch sử sửa đổi, optimistic locking cho wiki pages.
+- QA: Tạo Test Case, Test Run, Test Step. Khi Test Step đánh dấu FAILED, hệ thống tự động sinh Issue loại BUG và gán lại cho Developer.
+- Git: Xác thực Webhook bằng HMAC-SHA256, Regex Parser trích xuất mã task từ commit message.
+- EVM: Tính toán PV, EV, AC, CV, SV, CPI, SPI hàng ngày dựa trên baseline.
 
 ## 5. Kết quả Frontend — `npm test` (Vitest) + `npm run build`
 
-**Vitest: 3 test files, 15 tests PASS** (2026-08-03):
+**Vitest: 4 test files, 73 tests PASS** (2026-08-22):
 
 | File | Số test | Nội dung |
 |---|---|---|
 | `app.spec.ts` | 1 | Smoke khởi tạo core |
-| `report.service.spec.ts` | 4 | URL + params: tasks-by-status, overdue (pagination), project-progress (multi projectId), export CSV blob |
-| `admin.service.spec.ts` | 10 | Users GET/POST/PUT/PATCH, roles permissions PUT, audit logs GET, catalog permission duy nhất + đủ 32 code seed |
+| `report.service.spec.ts` | 4 | URL + params: tasks-by-status, overdue, export CSV |
+| `admin.service.spec.ts` | 14 | CRUD Users/Roles/Permissions, Audit logs |
+| `plan.service.spec.ts` | 54 | CRUD Plan, WBS actions, Scheduling, Resource capacity, Version & Baseline |
 
-**Build**: `npm run build` — PASS (AOT + type-check). Cảnh báo còn lại (không chặn release):
+**Build**: `npm run build` — PASS (AOT + type-check).
+*   **Đặc biệt**: Toàn bộ budget warnings của SCSS đã được dọn sạch nhờ gộp các component SCSS chung lên `styles.scss` (SCSS budget clean).
 
-- `task-list.component.scss` 16.33 kB > budget 16.00 kB (+0.3 kB).
-- `task-detail.component.scss` 18.16 kB > budget 16.00 kB (+2.2 kB).
-- *Đã biết, cố ý giữ nguyên (style dày cho Kanban/detail); không ảnh hưởng chức năng.*
+## 6. Kịch bản E2E Playwright — `npm run e2e`
 
-## 6. Smoke test E2E — Docker Compose
+Đã tích hợp framework Playwright vào frontend và tạo 3 kịch bản kiểm thử E2E:
+1.  `planning.spec.ts`: Kiểm tra luồng Lập kế hoạch (WBS, Lịch găng CPM và Gantt SVG).
+2.  `agile-git.spec.ts`: Kiểm tra luồng lập Sprint Backlog và tab tích hợp Git trong chi tiết Task.
+3.  `qa-finance.spec.ts`: Kiểm tra màn hình QA (Test Cases & Test Runs) và tab báo cáo Tài chính EVM (SPI/CPI chart).
 
-### 6.1 Triển khai
+## 7. Kiểm chứng hiệu năng (Performance Test)
 
-```powershell
-docker compose up -d --build
-```
+Đã chạy script test tải với **500 tasks** liên tiếp trên WBS:
+-   **Thời gian thêm 500 tasks**: `17.70` giây.
+-   **Đường găng & Lập lịch (Scheduling recalc)**: Chỉ tốn `365.18` ms (Mục tiêu: `< 1.5` giây $\rightarrow$ **Đạt**).
+-   **Lấy dữ liệu Gantt SVG**: Chỉ tốn `177.33` ms (Mượt mà trên giao diện $\rightarrow$ **Đạt**).
 
-Kết quả (2026-08-03):
+## 8. Smoke test E2E & Demo Flow
 
-| Container | Trạng thái | Healthcheck |
-|---|---|---|
-| `pmdaily-postgres` (postgres:16-alpine) | Up | Healthy (pg_isready) |
-| `pmdaily-backend` (pmdaily-backend) | Up | Healthy (GET /actuator/health = `{"status":"UP"}`) |
-| `pmdaily-frontend` (nginx) | Up | — |
+### 8.1 Smoke Test (`scripts/smoke-test.ps1`)
+Chạy trực tiếp qua Nginx proxy (`http://localhost:4200`): **14/14 PASS**.
 
-### 6.2 Kịch bản & kết quả
-
-Kiểm chứng qua Nginx proxy (`http://localhost:4200`) — đúng đường truyền trình duyệt thật.
-
-| # | Kịch bản | Kết quả |
-|---|---|---|
-| 1 | `GET http://localhost:4200` trả trang SPA | HTTP 200, `text/html` — PASS |
-| 2 | `GET /actuator/health` (backend) | `{"status":"UP"}` — PASS |
-| 3 | `POST /api/v1/auth/login` sai mật khẩu | HTTP 401, audit ghi `LOGIN_FAILED` — PASS |
-| 4 | `POST /api/v1/auth/login` admin/`Admin@123` | HTTP 200, accessToken + refreshToken, roles=`ADMIN`, 32 permissions — PASS |
-| 5 | `GET /api/v1/auth/me` (Bearer token) | HTTP 200 — PASS |
-| 6 | `GET /api/v1/dashboard/summary` | HTTP 200 — 10 chỉ số (tasksToday=1, overdue=2, inProgress=2, blocked=1, pendingActionItems=2, highRisks=1, openIssues=1…) — PASS |
-| 7 | `GET /api/v1/users?size=2` | HTTP 200 — PASS |
-| 8 | `GET /api/v1/roles` | HTTP 200 — PASS |
-| 9 | `GET /api/v1/reports/tasks-by-status?projectId=…` | HTTP 200 — PASS |
-| 10 | `GET /api/v1/reports/project-progress` | HTTP 200 — PASS |
-| 11 | `GET /api/v1/audit-logs?size=2` | HTTP 200 — PASS |
-| 12 | `GET /api/v1/projects` | HTTP 200 — PASS |
-| 13 | `GET /api/v1/meetings` | HTTP 200 — PASS |
-| 14 | `GET /api/v1/notifications/unread-count` | HTTP 200 — PASS |
-| 15 | Audit log ghi nhận hoạt động đăng nhập (write path) | `LOGIN_SUCCESS` × 4, `LOGIN_FAILED` × 1 — PASS |
-
-**Kết luận smoke test: 15/15 PASS.** Toàn bộ luồng trình duyệt → Nginx → Backend → PostgreSQL hoạt động, bao gồm API mới (users/roles/reports/audit) và write path (audit log).
-
-## 7. Kiểm thử thủ công (khuyến nghị sau deploy)
-
-Chưa có E2E framework (Playwright/Cypress) ở v1 — danh sách kịch bản thủ công trước khi bàn giao:
-
-- [ ] Đăng nhập/đăng xuất, refresh token khi mở lại tab sau 15 phút.
-- [ ] Tạo/sửa/xóa dự án → tạo task → đổi trạng thái → complete → xem dashboard cập nhật.
-- [ ] Tạo meeting → thêm participant → upload attachment → tạo action item → convert → task xuất hiện trong danh sách.
-- [ ] Create user qua Admin UI → user mới login được; vô hiệu hóa → user bị chặn login.
-- [ ] Chỉnh quyền role ở Admin UI → quyền mới có hiệu lực ngay (sidebar/route guard).
-- [ ] Report UI: đổi tab, filter dự án/ngày, export CSV mở được đúng nội dung.
-- [ ] Nhật ký audit hiển thị hành động của phiên hiện tại.
-
-## 8. Chặn release (đã xử lý trong v1.0.0)
-
-| Vấn đề | Cách xử lý |
-|---|---|
-| `UserResponse` không trả `version` nhưng update/status yêu cầu version → FE không thể gọi | Thêm `long version` vào `UserResponse` (MapStruct tự map), cập nhật docs 02 |
-| `npx vitest run` trực tiếp fail (thiếu Angular setup) | Dùng đúng lệnh chuẩn `npm test` (Angular unit-test builder) — ghi chú trong AGENTS.md |
+### 8.2 Demo Flow (`scripts/demo-flow-project.ps1`)
+Chạy luồng nghiệp vụ tạo dự án CRM mẫu, lập kế hoạch, phân bổ nguồn lực, baseline và sync milestone: **11/11 PASS**.
 
 ## 9. Kết luận
 
-Toàn bộ tiêu chí chất lượng trước phát hành đạt: **216 backend tests + 15 FE tests PASS, build cả 2 stack PASS, smoke test E2E 15/15 PASS trên Docker Compose chính thức**. Sẵn sàng chuyển sang `docs/release/02-code-review.md` và `03-release-notes.md`.
+Mã nguồn đạt trạng thái chất lượng cao và sẵn sàng đóng gói phát hành: **295 backend tests + 73 frontend tests PASS, Playwright E2E sẵn sàng, build cả 2 stack sạch sẽ, smoke test & demo flow 100% PASS trên Docker**.

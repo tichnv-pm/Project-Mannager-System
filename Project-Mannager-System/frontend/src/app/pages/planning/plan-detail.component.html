@@ -149,7 +149,7 @@
       <div *ngIf="plan()?.planType === 'MASTER'" class="children-section">
         <div class="section-header">
           <h3>Detail Plans thuộc Master ({{ childPlans().length }})</h3>
-          <a *hasPermission="'plan:create'" [routerLink]="['/plans']" class="btn-secondary">➕ Tạo Detail Plan</a>
+          <a *hasPermission="'plan:create'" [routerLink]="['/plans']" [queryParams]="{ action: 'create', projectId: plan()?.projectId, parentPlanId: plan()?.id }" class="btn-secondary">➕ Tạo Detail Plan</a>
         </div>
 
         <app-empty-state
@@ -157,11 +157,11 @@
           title="Chưa có Detail Plan"
           description="Tạo các Detail Plan (backend/frontend/testing...) thuộc Master này để chi tiết hóa WBS."
         >
-          <a [routerLink]="['/plans']" class="btn-primary">Tạo Detail Plan</a>
+          <a [routerLink]="['/plans']" [queryParams]="{ action: 'create', projectId: plan()?.projectId, parentPlanId: plan()?.id }" class="btn-primary">Tạo Detail Plan</a>
         </app-empty-state>
 
         <div *ngIf="childPlans().length > 0" class="children-grid">
-          <div *ngFor="let c of childPlans()" class="child-card">
+          <div *ngFor="let c of childPlans()" class="child-card" [routerLink]="['/plans', c.id]">
             <div class="card-top">
               <span class="code-badge">{{ c.planCode }}</span>
               <app-status-chip [status]="c.status"></app-status-chip>

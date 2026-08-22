@@ -234,7 +234,7 @@ Check 'Buoc 4 - Giao viec (2 execution task + link primary)' {
 # 7. Buoc 5: Baseline (master APPROVED + baseline 1)
 Check 'Buoc 5 - Baseline master (APPROVED + baseline >= 1)' {
     $m = Get-Json "$API/plans/$masterId" $H
-    if ($m.status -ne 'APPROVED') {
+    if ($m.status -eq 'DRAFT' -or $m.status -eq 'SUBMITTED') {
         $null = Invoke-WebRequest -Uri "$API/plans/$masterId/submit" -Method POST -Headers $H -UseBasicParsing -TimeoutSec 20
         $null = Invoke-WebRequest -Uri "$API/plans/$masterId/approve" -Method POST -Headers $H -UseBasicParsing -TimeoutSec 20
         $null = Post-Json "$API/plans/$masterId/versions" $H @{ note = 'Version 1 - Master chuan FULL_SDL' }

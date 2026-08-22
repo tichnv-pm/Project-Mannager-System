@@ -1,141 +1,78 @@
-# PM Daily Work Management — Release Notes v1.0.0
+# PM Daily Work Management — Release Notes v1.2.0
 
-> Nguồn: Prompt 24 (Release), `docs/00-project-overview.md`, `docs/design/07-deployment-design.md`.
-> Ngày phát hành: **2026-08-04** (v1.0.0 — PHÁT HÀNH HOÀN CHỈNH).
+> Cập nhật: 2026-08-22 (v1.2.0 — PHÁT HÀNH HOÀN CHỈNH v1.1 & v1.2).
 
 ## 1. Tổng quan
 
-PM Daily Work Management v1.0.0 — Ứng dụng quản lý công việc hằng ngày cho quản lý dự án phần mềm (nội bộ, tiếng Việt).
+PM Daily Work Management v1.2.0 nâng cấp toàn diện ứng dụng lên chuẩn quản lý dự án công nghệ toàn trình (End-to-End Software Management) với các cấu phần từ Lập kế hoạch (WBS/CPM), Phân bổ nguồn lực, Lập lịch, đến Thực thi Agile Sprints, Đảm bảo chất lượng (QA), Tích hợp Git và Quản lý tài chính dự án (EVM).
 
-## 2. Tính năng
+## 2. Tính năng mới & Mở rộng
 
-| Module | Tính năng chính |
+| Phân hệ | Tính năng chính |
 |---|---|
-| Auth | Login (lock 5 lần/5 phút), refresh token rotation, logout, đổi mật khẩu, ADMIN reset mật khẩu |
-| Dashboard | 10 chỉ số summary, cảnh báo quá hạn/blocker/risk cao, biểu đồ status/priority, tiến độ dự án |
-| Project | CRUD + soft delete, quản lý thành viên (PM/ADMIN), search/filter |
-| Task | Kanban 6 cột, 25 endpoints (CRUD, search lọc, state machine, tags/collaborators/watchers, comments, attachments, history, export Excel, mã tự sinh `PRJXXX-TASK-000001`) |
-| Meeting | CRUD, quick filter, complete khóa biên bản, participants, attachments, action items (CRUD + convert → task) |
-| Risk & Issue | CRUD, ma trận level/severity, convert risk OCCURRED → issue |
-| Milestone | CRUD, COMPLETED bắt buộc progress 100% |
-| Notification | In-app + unread badge realtime, cron job task sắp hạn/quá hạn |
-| Report | 5 báo cáo (status/assignee/overdue/progress/risk-issue), filter dự án + ngày, export CSV |
-| Admin | Người dùng (CRUD + vô hiệu hóa), vai trò & phân quyền, nhật ký audit |
+| **v1.1 Project Planning** | - **WBS Editor**: Lập kế hoạch phân rã công việc dạng cây (indent/outdent/move), tự động đánh số `wbs_code`. <br> - **Scheduling Engine**: Topo forward pass theo dependency (FS/SS/FF/SF + lag) và working calendar. <br> - **Critical Path (CPM)**: Tính toán float và đánh dấu đường găng (critical path). <br> - **Resource Planning**: Gán allocation %, xem biểu đồ workload DAY/WEEK/MONTH chéo dự án. <br> - **Gantt UI**: SVG Gantt chart tự vẽ, hiển thị timeline, critical path, milestones, và dependencies. <br> - **Baseline & Version**: Chụp snapshot baseline, so sánh phiên bản (variance). |
+| **v1.2 E2E Software Management** | - **Agile/Sprints**: Tạo sprint, gán backlog, kéo thả công việc, cảnh báo vượt hạn sprint. <br> - **Project Wiki**: Biên soạn tài liệu theo mẫu có sẵn (Getting Started, Architecture, v.v.). <br> - **QA Testing**: Lập test case, chạy test run. Test step thất bại sẽ tự động kích hoạt tạo `Issue` loại `BUG` gán lại cho Dev. <br> - **Git Integration**: Tự động chuyển trạng thái task và liên kết commit/PR qua Git Webhook (xác thực HMAC-SHA256). <br> - **EVM Finance**: Quản lý đơn giá thành viên (mã hóa cột AES-256-GCM), tính toán chỉ số PV, EV, AC, CPI, SPI hàng ngày vẽ đồ thị SVG. |
 
-## 3. Kiến trúc & công nghệ
+## 3. Kiến trúc & Công nghệ
 
-- **Backend**: Java 21, Spring Boot 3.x, Spring Security + JWT, Spring Data JPA, Flyway, MapStruct, Bean Validation, springdoc, Maven. Modular Monolith 15 module, package `com.example.pmdaily`.
+- **Backend**: Java 21, Spring Boot 3.x, Spring Security + JWT, Spring Data JPA, Flyway, MapStruct, Maven. Database PostgreSQL 16 (AES-256-GCM column encryption).
 - **Frontend**: Angular 22 (standalone, zoneless, signals), Angular Material, Reactive Forms, Vitest, SCSS.
-- **DB**: PostgreSQL 16, PK UUID, `snake_case`, `timestamptz` UTC.
-- **Deploy**: Docker Compose (postgres + backend + frontend-Nginx reverse proxy `/api/`).
+- **E2E Testing**: Playwright framework (`@playwright/test`).
+- **Deploy**: Docker Compose (postgres + backend + frontend-Nginx reverse proxy).
 
 ## 4. Chất lượng phát hành
 
-- Backend: **222 tests PASS** (0 failure, 0 skipped) — `mvn clean test`.
-- Frontend: **19 tests PASS** — `npm test`; build PASS — `npm run build`.
-- Smoke E2E trên Docker Compose chính thức: **15/15 PASS** (chi tiết `docs/release/01-test-plan.md`).
-- Review mã nguồn: không vấn đề chặn; 7 ghi nhận v1.1 (`docs/release/02-code-review.md`).
+- Backend: **295 tests PASS** (0 failure, 0 skipped) — `mvn clean test`.
+- Frontend: **73 tests PASS** — `npm test`; build PASS — `npm run build` (SCSS budget clean).
+- Smoke E2E: **14/14 PASS** — `scripts/smoke-test.ps1`.
+- Demo Flow CRM: **11/11 PASS** — `scripts/demo-flow-project.ps1`.
+- Playwright E2E: Sẵn sàng 3 spec files phủ các luồng chính.
+- Hiệu năng Gantt (500 tasks): Recalc mất `365` ms, Gantt API mất `177` ms ($\rightarrow$ **Rất tốt**).
 
-## 5. Hướng dẫn cài đặt & chạy
+## 5. Hướng dẫn chạy local
 
-### 5.1 Yêu cầu
-
-- Docker Desktop (daemon chạy) — khuyến nghị; hoặc JDK 21 + Node ≥ 22 + PostgreSQL 16 chạy thủ công.
-
-### 5.2 Chạy bằng Docker Compose (chuẩn)
+### 5.1 Khởi chạy bằng Docker Compose (chuẩn)
 
 ```powershell
-# 1. Tạo .env từ mẫu (nếu chưa có)
+# 1. Tạo .env từ mẫu
 Copy-Item .env.example .env
-#    → sửa JWT_SECRET (tối thiểu 32 ký tự), POSTGRES_PASSWORD, DB_PASSWORD
+#    → Cấu hình JWT_SECRET (tối thiểu 32 ký tự) và các mật khẩu
 
-# 2. Build & khởi động
+# 2. Khởi chạy Docker Desktop (nếu chưa chạy)
+# 3. Build & khởi động các container
 docker compose up -d --build
 
-# 3. Kiểm tra
-docker compose ps                 # cả 3 container Up
-curl http://localhost:8080/actuator/health   # {"status":"UP"}
-
-# 4. Truy cập
-#    Frontend: http://localhost:4200  (proxy /api → backend:8080)
-
-# 5. Dừng
-docker compose down               # giữ dữ liệu (volume pgdata)
-docker compose down -v            # xóa luôn dữ liệu
+# 4. Chạy script tạo dữ liệu mẫu CRM chuẩn
+powershell -ExecutionPolicy Bypass -File scripts/demo-flow-project.ps1
 ```
 
-### 5.3 Tài khoản demo (chỉ local)
+*   **Truy cập**:
+    *   Frontend: `http://localhost:4200`
+    *   Backend/Swagger: `http://localhost:8080/swagger-ui.html`
+
+### 5.2 Tài khoản demo
 
 | Tài khoản | Mật khẩu | Vai trò |
 |---|---|---|
 | `admin` | `Admin@123` | ADMIN hệ thống |
 | `pm.minh` | `Pm@12345` | PROJECT_MANAGER |
-| `member1` | `Member@123` | PROJECT_MEMBER |
-| `member2` / `member3` | `Member@123` | PROJECT_MEMBER |
+| `member1` | `Member@123` | PROJECT_MEMBER (Developer 1) |
+| `member2` | `Member@123` | PROJECT_MEMBER (Tester) |
+| `member3` | `Member@123` | PROJECT_MEMBER (Developer 2) |
 
-> Mật khẩu demo KHÔNG dùng cho production (NFR-DATA-02).
+## 6. Checklist phát hành v1.2.0
 
-### 5.4 Chạy thủ công (không Docker)
-
-```powershell
-# Backend (JDK 21 + Maven 3.9+)
-cd backend
-mvn spring-boot:run -Dspring-boot.run.profiles=local
-# Frontend (Node ≥ 22)
-cd frontend
-npm install
-npm start          # http://localhost:4200 (proxy → localhost:8080)
-```
-
-## 6. Cấu hình môi trường
-
-| Biến | Mặc định | Bắt buộc | Mô tả |
-|---|---|---|---|
-| `POSTGRES_DB/USER/PASSWORD` | `pmdaily` | — | DB container |
-| `DB_URL` | `jdbc:postgresql://postgres:5432/pmdaily` | — | Chuỗi kết nối backend |
-| `DB_USERNAME` / `DB_PASSWORD` | `pmdaily` | — | Tài khoản DB của backend |
-| `JWT_SECRET` | — | ✔ | Khóa JWT ≥ 32 ký tự |
-| `JWT_ACCESS_EXPIRATION` | `900000` (15 phút) | — | ms |
-| `JWT_REFRESH_EXPIRATION` | `604800000` (7 ngày) | — | ms |
-| `CORS_ALLOWED_ORIGINS` | `http://localhost:4200` | — | Danh sách origin |
-| `SPRING_PROFILES_ACTIVE` | `local` | — | `local` có seed demo |
-
-## 7. Runbook — Xử lý sự cố
-
-| Sự cố | Nguyên nhân | Xử lý |
-|---|---|---|
-| `docker compose up` lỗi port 5432/8080/4200 | Port bị chiếm (IDE, service khác) | `Get-NetTCPConnection -LocalPort 5432,8080,4200` tìm process; đổi port trong compose hoặc dừng process |
-| Backend không Healthy, log `Connection refused` | Postgres chưa sẵn sàng | `docker compose logs backend`; đợi healthcheck postgres (có `depends_on: condition: service_healthy`) |
-| `JWT_SECRET is required` | Thiếu biến trong `.env` | Sửa `.env` đúng mẫu `.env.example` |
-| Login 401 dù đúng mật khẩu | Nhầm profile (seed không chạy ở production profile) | Dùng `SPRING_PROFILES_ACTIVE=local`; kiểm tra account `admin/Admin@123` |
-| Dữ liệu seed lặp sau khi build lại | Volume cũ chứa dữ liệu | `docker compose down -v && docker compose up -d --build` |
-| Frontend trắng trang, console 404 `/api/...` | Proxy nginx chưa reach backend | `docker compose ps` kiểm tra backend Healthy; xem `docker compose logs frontend` |
-| RAM Docker Desktop cao | Nhiều container/image | `docker system prune` (cẩn thận xóa image cần dùng) |
-
-## 8. Backup & Restore (PostgreSQL)
-
-```powershell
-# Backup
-docker exec pmdaily-postgres pg_dump -U pmdaily pmdaily > backup-2026-08-03.sql
-# Restore
-Get-Content backup-2026-08-03.sql | docker exec -i pmdaily-postgres psql -U pmdaily pmdaily
-```
-
-## 9. Checklist phát hành
-
-- [x] `mvn clean test` — 222 PASS
-- [x] `npm test` — 19 PASS
-- [x] `npm run build` — PASS
+- [x] `mvn clean test` — 295 PASS
+- [x] `npm test` — 73 PASS
+- [x] `npm run build` — PASS (SCSS budget warnings dọn sạch)
 - [x] `docker compose up -d --build` — 3 container Up, backend Healthy
-- [x] Smoke test E2E 15/15 — login/me/dashboard/users/roles/reports/audit/notifications
-- [x] Không hard-code secret; `.env` không commit
+- [x] Smoke test E2E 14/14 PASS
+- [x] Demo flow CRM 11/11 PASS (Dữ liệu mẫu chuẩn hóa)
+- [x] Performance check Gantt 500 tasks (recalc < 400ms, Gantt API < 200ms)
 - [x] Tài liệu: test plan, code review, release notes hoàn chỉnh
-- [x] Kịch bản thủ công mục 7 — kiểm chứng luồng chính qua smoke E2E 15/15 PASS trên Docker Compose thật
 
-## 10. Backlog v1.1
+## 7. Backlog tiếp theo (v1.3.0)
 
-1. E2E framework (Playwright/Cypress) thay kịch bản thủ công.
-2. Giới hạn kích thước export CSV + streaming khi dữ liệu lớn.
-3. Tối ưu SCSS (giảm budget warning task list/detail).
-4. Cache tab Admin/Report; batch fetch user list khi scale.
-5. Hỗ trợ email notification (ngoài phạm vi v1).
+1.  Hỗ trợ Email/SMS Notifications thực tế (ngoài in-app).
+2.  Bổ sung Realtime updates bằng WebSockets.
+3.  Cấu hình đa ngôn ngữ (i18n).

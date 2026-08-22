@@ -1,8 +1,8 @@
 # AGENTS.md
 
 PM Daily Work Management — ứng dụng quản lý công việc hằng ngày cho quản lý dự án phần mềm.
-Trạng thái: **v1.0.0 PHÁT HÀNH HOÀN CHỈNH** (Prompt 02–24 đều ✔ 2026-08-04): Backend 222 tests PASS; Frontend 19 tests + build PASS; Docker Compose 3 container Up + smoke E2E 15/15 PASS; Tài liệu Release đầy đủ (`docs/release/01-test-plan.md`, `02-code-review.md`, `03-release-notes.md`).
-Giai đoạn hiện tại: **v1.1 — PROJECT PLANNING HOÀN TẤT ✔ 2026-08-11**: Backend 10 sub-modules PLN-BE-01..10 ✔ 2026-08-07/08 — **281 tests PASS**; **Frontend module `planning` PLN-FE-01..10 ✔ 2026-08-10/11** (plan list/editor WBS, dependency, calendar, recalc/critical path, resource, baseline, change/link, template/portfolio, Gantt — **Gantt tự dựng SVG, license đã chốt 2026-08-07** docs/planning/13 §4; npm test 73 PASS + build PASS). Backlog v1.1 còn: E2E framework (Playwright/Cypress) — export CSV streaming ✔ và tối ưu SCSS budget ✔ đã hoàn tất 2026-08-11 (281 tests PASS; npm test 73 PASS + build PASS không warning budget) — kế hoạch chi tiết `docs/status-report-2026-08-10.md`.
+Trạng thái: **v1.2.0 PHÁT HÀNH HOÀN CHỈNH (v1.1 & v1.2)** (✔ 2026-08-22): Backend **295 tests PASS**; Frontend **73 tests + build PASS** (SCSS budget warnings dọn sạch); E2E Playwright framework tích hợp sẵn (e2e/); Docker Compose 3 container Up + smoke E2E 14/14 PASS + CRM Demo Flow 11/11 PASS; Hiệu năng Gantt 500 tasks (recalc 365ms, Gantt API 177ms); Tài liệu Release đầy đủ (`docs/release/01-test-plan.md`, `02-code-review.md`, `03-release-notes.md`).
+Giai đoạn hiện tại: **v1.2 — E2E SOFTWARE MANAGEMENT HOÀN TẤT ✔ 2026-08-22**: Tích hợp Agile/Sprints, Project Wiki templates, QA Testing module, Git Webhooks, và EVM Finance. Toàn bộ tests và builds đã pass, mã nguồn sạch sẽ.
 
 ## Quy trình làm việc (bắt buộc)
 

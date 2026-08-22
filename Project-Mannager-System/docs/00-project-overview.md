@@ -1,8 +1,8 @@
 # PM Daily Work Management — Tổng quan dự án
 
 > Tài liệu gốc: `docs/00-project-overview.md`
-> Trạng thái: cập nhật 2026-08-10 — **v1.0.0 PHÁT HÀNH HOÀN CHỈNH** (Prompt 02–24 đều ✔): Backend 222 tests PASS, Frontend 19 tests + build PASS, Docker Compose 3 container Up + smoke E2E 15/15 PASS, tài liệu release đầy đủ.
-> Giai đoạn hiện tại: **v1.1 — PROJECT PLANNING** (tài liệu planning hoàn tất `docs/planning/01..15` + `docs/api/13-planning-api.md`; **PLN-BE-01..10 backend đều ✔ 2026-08-07/08 — 281 tests PASS**). **Frontend module `planning` PLN-FE-01..10 ĐÃ HOÀN TẤT ✔ 2026-08-10/11** (Gantt UI tự dựng SVG, license đã chốt — docs/planning/13 §4; npm test 73 PASS). Backlog v1.1 còn: E2E framework (Playwright), export CSV streaming, tối ưu SCSS budget — chi tiết `docs/status-report-2026-08-10.md`.
+> Trạng thái: cập nhật 2026-08-22 — **v1.2.0 PHÁT HÀNH HOÀN CHỈNH (v1.1 & v1.2)**: Backend 295 tests PASS, Frontend 73 tests + build PASS (SCSS budget warnings dọn sạch), Docker Compose 3 container Up + smoke E2E 14/14 PASS + CRM Demo Flow 11/11 PASS, tài liệu release đầy đủ.
+> Giai đoạn hiện tại: **v1.2 — E2E SOFTWARE MANAGEMENT** (Tích hợp Agile/Sprints, Project Wiki, QA, Git, EVM Finance hoàn tất cả backend và frontend, Playwright E2E framework sẵn sàng).
 
 ## 1. Mục tiêu sản phẩm
 

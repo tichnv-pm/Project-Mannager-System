@@ -82,10 +82,15 @@ export class PlanDetailComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.planId = this.route.snapshot.paramMap.get('id');
-    if (this.planId) {
-      this.loadPlan();
-    }
+    this.route.paramMap.subscribe(params => {
+      this.planId = params.get('id');
+      if (this.planId) {
+        this.masterPlan.set(null);
+        this.childPlans.set([]);
+        this.activeTab = 'overview';
+        this.loadPlan();
+      }
+    });
   }
 
   loadPlan(): void {
