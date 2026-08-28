@@ -142,12 +142,12 @@
                   class="role-select"
                 >
                   <option value="PROJECT_MANAGER">Quản lý dự án (PM)</option>
-                  <option value="DEV">Lập trình viên (DEV)</option>
-                  <option value="TESTER">Kiểm thử viên (TESTER)</option>
-                  <option value="BA">Phân tích nghiệp vụ (BA)</option>
+                  <option value="TECH_LEAD">Trưởng nhóm kỹ thuật (Tech Lead)</option>
+                  <option value="DEVELOPER">Lập trình viên (Developer)</option>
+                  <option value="TESTER">Kiểm thử viên (Tester)</option>
+                  <option value="BUSINESS_ANALYST">Phân tích nghiệp vụ (BA)</option>
                   <option value="DEVOPS">Kỹ sư DevOps</option>
-                  <option value="DESIGNER">Thiết kế (DESIGNER)</option>
-                  <option value="PROJECT_MEMBER">Thành viên</option>
+                  <option value="MEMBER">Thành viên khác</option>
                 </select>
                 <span *ngIf="!authService.hasPermission('project-member:manage')" class="role-badge">
                   {{ getRoleLabel(m.role) }}
@@ -212,12 +212,12 @@
           <label>Vai trò trong dự án <span class="req">*</span></label>
           <select formControlName="role" class="form-control">
             <option value="PROJECT_MANAGER">Quản lý dự án (PM)</option>
-            <option value="DEV">Lập trình viên (DEV)</option>
-            <option value="TESTER">Kiểm thử viên (TESTER)</option>
-            <option value="BA">Phân tích nghiệp vụ (BA)</option>
+            <option value="TECH_LEAD">Trưởng nhóm kỹ thuật (Tech Lead)</option>
+            <option value="DEVELOPER">Lập trình viên (Developer)</option>
+            <option value="TESTER">Kiểm thử viên (Tester)</option>
+            <option value="BUSINESS_ANALYST">Phân tích nghiệp vụ (BA)</option>
             <option value="DEVOPS">Kỹ sư DevOps</option>
-            <option value="DESIGNER">Thiết kế (DESIGNER)</option>
-            <option value="PROJECT_MEMBER">Thành viên</option>
+            <option value="MEMBER">Thành viên khác</option>
           </select>
         </div>
 

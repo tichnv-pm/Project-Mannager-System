@@ -1,6 +1,6 @@
 export type ProjectStatus = 'PLANNING' | 'ACTIVE' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED';
 
-export type ProjectMemberRole = 'PROJECT_MANAGER' | 'DEV' | 'TESTER' | 'BA' | 'DEVOPS' | 'DESIGNER' | 'PROJECT_MEMBER';
+export type ProjectMemberRole = 'PROJECT_MANAGER' | 'TECH_LEAD' | 'DEVELOPER' | 'TESTER' | 'BUSINESS_ANALYST' | 'DEVOPS' | 'MEMBER' | 'DEV' | 'BA' | 'PROJECT_MEMBER';
 
 export interface ProjectResponse {
   id: string;

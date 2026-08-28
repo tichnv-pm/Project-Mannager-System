@@ -58,7 +58,7 @@ export class ProjectDetailComponent implements OnInit {
   constructor() {
     this.memberForm = this.fb.group({
       userId: ['', [Validators.required]],
-      role: ['DEV', [Validators.required]]
+      role: ['DEVELOPER', [Validators.required]]
     });
   }
 
@@ -171,12 +171,15 @@ export class ProjectDetailComponent implements OnInit {
   getRoleLabel(role: string): string {
     const map: Record<string, string> = {
       'PROJECT_MANAGER': 'Quản lý dự án (PM)',
-      'DEV': 'Lập trình viên (DEV)',
-      'TESTER': 'Kiểm thử viên (TESTER)',
+      'TECH_LEAD': 'Trưởng nhóm kỹ thuật (Tech Lead)',
+      'DEVELOPER': 'Lập trình viên (Developer)',
+      'DEV': 'Lập trình viên (Developer)',
+      'TESTER': 'Kiểm thử viên (Tester)',
+      'BUSINESS_ANALYST': 'Phân tích nghiệp vụ (BA)',
       'BA': 'Phân tích nghiệp vụ (BA)',
       'DEVOPS': 'Kỹ sư DevOps',
-      'DESIGNER': 'Thiết kế (DESIGNER)',
-      'PROJECT_MEMBER': 'Thành viên'
+      'MEMBER': 'Thành viên khác',
+      'PROJECT_MEMBER': 'Thành viên khác'
     };
     return map[role] || role;
   }
