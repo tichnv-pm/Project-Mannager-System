@@ -21,6 +21,7 @@ public class WebConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
         boolean hasWildcard = allowedOrigins != null && allowedOrigins.stream().anyMatch(o -> o.contains("*"));
         if (hasWildcard) {
             config.setAllowedOriginPatterns(allowedOrigins);
