@@ -2,9 +2,9 @@ spring:
   application:
     name: pmdaily-backend
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/pmdaily}
-    username: ${DB_USERNAME:pmdaily}
-    password: ${DB_PASSWORD:}
+    url: ${DB_URL:${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/pmdaily}}
+    username: ${DB_USERNAME:${SPRING_DATASOURCE_USERNAME:pmdaily}}
+    password: ${DB_PASSWORD:${SPRING_DATASOURCE_PASSWORD:}}
   jpa:
     open-in-view: false
     hibernate:
@@ -18,7 +18,7 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
-    target: 1
+    target: ${FLYWAY_TARGET:latest}
   jackson:
     time-zone: UTC
     default-property-inclusion: non_null
@@ -28,7 +28,7 @@ spring:
       max-request-size: 12MB
 
 server:
-  port: 8080
+  port: ${PORT:8080}
   error:
     include-message: never
 
@@ -55,10 +55,12 @@ app:
     login:
       max-failed-attempts: ${LOGIN_MAX_FAILED_ATTEMPTS:5}
       lock-duration-minutes: ${LOGIN_LOCK_DURATION_MINUTES:5}
+  webhook:
+    git-secret: ${APP_WEBHOOK_GIT_SECRET:git-webhook-secret-key-12345}
 
 logging:
   level:
     root: INFO
-    com.example.pmdaily: DEBUG
+    com.example.pmdaily: INFO
   pattern:
     console: "%d{ISO8601} %-5level [%X{traceId}] [%X{userId}] %logger{40} - %msg%n"

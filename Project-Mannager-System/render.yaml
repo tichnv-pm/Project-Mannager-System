@@ -1,0 +1,50 @@
+services:
+  # ============================================================================
+  # 1. BACKEND SERVICE (Spring Boot 3 + Java 21)
+  # ============================================================================
+  - type: web
+    name: pmdaily-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    region: singapore
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      # Cấu hình kết nối Neon PostgreSQL (nhập từ Neon Console)
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      # JWT & Security
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_EXPIRATION
+        value: "900000"
+      - key: JWT_REFRESH_EXPIRATION
+        value: "604800000"
+      - key: CORS_ALLOWED_ORIGINS
+        value: "*"
+      - key: APP_WEBHOOK_GIT_SECRET
+        generateValue: true
+
+  # ============================================================================
+  # 2. FRONTEND SERVICE (Angular 22 + Nginx Reverse Proxy)
+  # ============================================================================
+  - type: web
+    name: pmdaily-frontend
+    runtime: docker
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    plan: free
+    region: singapore
+    envVars:
+      - key: BACKEND_URL
+        fromService:
+          type: web
+          name: pmdaily-backend
+          property: host
