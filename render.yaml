@@ -13,11 +13,11 @@ services:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
       - key: DB_URL
-        sync: false
+        value: jdbc:postgresql://ep-purple-dream-azkoyql8-pooler.c-3.ap-southeast-1.aws.neon.tech/pmdaily?sslmode=require
       - key: DB_USERNAME
-        sync: false
+        value: neondb_owner
       - key: DB_PASSWORD
-        sync: false
+        value: npg_BC8oekY2bZVi
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_ACCESS_EXPIRATION
@@ -40,4 +40,4 @@ services:
     region: singapore
     envVars:
       - key: BACKEND_URL
-        sync: false
+        value: https://pmdaily-backend.onrender.com
