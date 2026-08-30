@@ -348,6 +348,20 @@ export class TaskDetailComponent implements OnInit {
     const t = this.task();
     if (!t) return;
     this.editError.set(null);
+    if (t.projectId && this.projectMembers().length === 0) {
+      this.projectService.getMembers(t.projectId).subscribe({
+        next: members => {
+          this.projectMembers.set(members || []);
+          this.patchEditForm(t);
+        },
+        error: () => this.patchEditForm(t)
+      });
+    } else {
+      this.patchEditForm(t);
+    }
+  }
+
+  private patchEditForm(t: TaskDetailResponse): void {
     this.editForm.patchValue({
       title: t.title, type: t.type, priority: t.priority,
       assigneeId: t.assignee?.id || '',

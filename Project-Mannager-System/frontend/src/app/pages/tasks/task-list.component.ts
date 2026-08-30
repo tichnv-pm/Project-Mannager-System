@@ -134,18 +134,27 @@ export class TaskListComponent implements OnInit, OnDestroy {
     });
 
     this.taskForm.get('projectId')?.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(projectId => {
-      this.loadProjectMembers(projectId);
+      if (projectId) {
+        this.loadProjectMembers(projectId);
+      }
     });
   }
 
-  loadProjectMembers(projectId: string): void {
+  loadProjectMembers(projectId: string, callback?: () => void): void {
     if (!projectId) {
       this.projectMembers.set([]);
+      if (callback) callback();
       return;
     }
     this.projectService.getMembers(projectId).subscribe({
-      next: members => this.projectMembers.set(members || []),
-      error: () => this.projectMembers.set([])
+      next: members => {
+        this.projectMembers.set(members || []);
+        if (callback) callback();
+      },
+      error: () => {
+        this.projectMembers.set([]);
+        if (callback) callback();
+      }
     });
   }
 
@@ -395,14 +404,15 @@ export class TaskListComponent implements OnInit, OnDestroy {
     this.editingTaskId = null;
     this.formError.set(null);
     const initialProjectId = this.selectedProjectId || (this.projectsList().length > 0 ? this.projectsList()[0].id : '');
-    this.loadProjectMembers(initialProjectId);
-    this.taskForm.reset({
-      projectId:   initialProjectId,
-      title: '', type: 'TASK', priority: 'MEDIUM',
-      assigneeId: '', startDate: '', dueDate: '',
-      description: '', notes: '', estimateMinutes: null, progress: 0,
+    this.loadProjectMembers(initialProjectId, () => {
+      this.taskForm.reset({
+        projectId:   initialProjectId,
+        title: '', type: 'TASK', priority: 'MEDIUM',
+        assigneeId: '', startDate: '', dueDate: '',
+        description: '', notes: '', estimateMinutes: null, progress: 0,
+      });
+      this.showModal.set(true);
     });
-    this.showModal.set(true);
   }
 
   openEditModal(task: TaskSummaryResponse): void {
@@ -415,21 +425,22 @@ export class TaskListComponent implements OnInit, OnDestroy {
         this.editingStatus = detail.status;
         this.editingBlocked = detail.blocked;
         this.editingBlockerReason = detail.blockerReason || '';
-        this.loadProjectMembers(detail.projectId);
-        this.taskForm.patchValue({
-          projectId:   detail.projectId,
-          title:       detail.title,
-          type:        detail.type,
-          priority:    detail.priority,
-          assigneeId:  detail.assignee?.id || '',
-          startDate:   detail.startDate || '',
-          dueDate:     detail.dueDate || '',
-          description: detail.description || '',
-          notes:       detail.notes || '',
-          estimateMinutes: detail.estimateMinutes ?? null,
-          progress:    detail.progress,
+        this.loadProjectMembers(detail.projectId, () => {
+          this.taskForm.patchValue({
+            projectId:   detail.projectId,
+            title:       detail.title,
+            type:        detail.type,
+            priority:    detail.priority,
+            assigneeId:  detail.assignee?.id || '',
+            startDate:   detail.startDate || '',
+            dueDate:     detail.dueDate || '',
+            description: detail.description || '',
+            notes:       detail.notes || '',
+            estimateMinutes: detail.estimateMinutes ?? null,
+            progress:    detail.progress,
+          }, { emitEvent: false });
+          this.showModal.set(true);
         });
-        this.showModal.set(true);
       },
       error: err => {
         this.error.set(this.extractError(err, 'Không thể tải chi tiết công việc'));
