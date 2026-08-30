@@ -95,6 +95,9 @@ export class TaskListComponent implements OnInit, OnDestroy {
   isEditMode = signal(false);
   editingTaskId: string | null = null;
   editingVersion = 0;
+  editingStatus: TaskStatus = 'TODO';
+  editingBlocked = false;
+  editingBlockerReason = '';
   formError = signal<string | null>(null);
   formSubmitting = signal(false);
   taskForm!: FormGroup;
@@ -409,6 +412,9 @@ export class TaskListComponent implements OnInit, OnDestroy {
     this.taskService.getTask(task.id).subscribe({
       next: detail => {
         this.editingVersion = detail.version;
+        this.editingStatus = detail.status;
+        this.editingBlocked = detail.blocked;
+        this.editingBlockerReason = detail.blockerReason || '';
         this.loadProjectMembers(detail.projectId);
         this.taskForm.patchValue({
           projectId:   detail.projectId,
@@ -449,6 +455,9 @@ export class TaskListComponent implements OnInit, OnDestroy {
         dueDate: v.dueDate || null, description: v.description || null,
         notes: v.notes || null, estimateMinutes: v.estimateMinutes || null,
         progress: v.progress ?? 0, version: this.editingVersion,
+        status: this.editingStatus,
+        blocked: this.editingBlocked,
+        blockerReason: this.editingBlockerReason || null,
       };
       this.taskService.updateTask(this.editingTaskId, req as any).subscribe({
         next: () => { this.formSubmitting.set(false); this.closeModal(); this.loadTasks(); },

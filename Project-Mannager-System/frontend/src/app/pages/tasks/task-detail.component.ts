@@ -376,6 +376,9 @@ export class TaskDetailComponent implements OnInit {
       description: v.description || null, notes: v.notes || null,
       estimateMinutes: v.estimateMinutes || null,
       progress: t.progress, version: t.version,
+      status: t.status,
+      blocked: t.blocked,
+      blockerReason: t.blockerReason || null,
     } as any).subscribe({
       next: (updated) => {
         this.task.set(updated);

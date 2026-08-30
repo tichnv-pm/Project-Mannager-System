@@ -748,10 +748,7 @@ public class TaskService {
     }
 
     private void applyStatusRules(Task task, TaskStatus status, Boolean blocked, String blockerReason) {
-        boolean wantBlocked = Boolean.TRUE.equals(blocked);
-        if (wantBlocked && (blockerReason == null || blockerReason.isBlank())) {
-            throw new BusinessException(ErrorCode.BLOCKER_REASON_REQUIRED);
-        }
+        boolean wantBlocked = Boolean.TRUE.equals(blocked) || status == TaskStatus.BLOCKED;
         if (status == TaskStatus.DONE) {
             if (task.getProgress() < 100) {
                 task.setProgress(100);
@@ -761,10 +758,14 @@ public class TaskService {
             }
         }
         task.setStatus(status);
-        if (wantBlocked || status == TaskStatus.BLOCKED) {
+        if (wantBlocked) {
             task.setBlocked(true);
-            task.setBlockerReason(blockerReason);
-        } else if (task.isBlocked()) {
+            if (blockerReason != null && !blockerReason.isBlank()) {
+                task.setBlockerReason(blockerReason);
+            } else if (task.getBlockerReason() == null || task.getBlockerReason().isBlank()) {
+                task.setBlockerReason("Tắc nghẽn");
+            }
+        } else {
             task.setBlocked(false);
             task.setBlockerReason(null);
         }
