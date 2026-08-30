@@ -1,6 +1,6 @@
 export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'REVIEW' | 'DONE' | 'BLOCKED' | 'CANCELLED';
 
-export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' | 'CRITICAL';
+export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
 export type TaskType = 'FEATURE' | 'BUG' | 'TASK' | 'IMPROVEMENT' | 'OTHER';
 

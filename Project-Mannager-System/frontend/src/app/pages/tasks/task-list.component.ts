@@ -87,7 +87,7 @@ export class TaskListComponent implements OnInit, OnDestroy {
   sort = 'createdAt,desc';
 
   readonly statusOptions: TaskStatus[] = ['TODO', 'IN_PROGRESS', 'REVIEW', 'BLOCKED', 'DONE', 'CANCELLED'];
-  readonly priorityOptions: TaskPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT', 'CRITICAL'];
+  readonly priorityOptions: TaskPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
   readonly typeOptions: TaskType[] = ['TASK', 'FEATURE', 'BUG', 'IMPROVEMENT', 'OTHER'];
 
   // ─── Modal: Create/Edit ────────────────────────────────────────────
@@ -343,7 +343,7 @@ export class TaskListComponent implements OnInit, OnDestroy {
 
   getPriorityIcon(priority: string): string {
     const icons: Record<string, string> = {
-      'LOW': '🟢', 'MEDIUM': '🟡', 'HIGH': '🟠', 'URGENT': '🔴', 'CRITICAL': '🚨'
+      'LOW': '🟢', 'MEDIUM': '🟡', 'HIGH': '🟠', 'CRITICAL': '🚨'
     };
     return icons[priority] || '';
   }
