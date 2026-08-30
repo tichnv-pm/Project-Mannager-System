@@ -11,17 +11,17 @@
 
   <div class="header-right">
     <!-- Notification Bell -->
-    <div class="notif-wrapper" (mouseleave)="closeNotifications()">
-      <button (click)="toggleNotifications()" class="btn-icon notif-btn" title="Thông báo">
+    <div class="notif-wrapper">
+      <button (click)="toggleNotifications($event)" class="btn-icon notif-btn" title="Thông báo" id="btn-notifications">
         🔔
         <span *ngIf="unreadCount > 0" class="badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
       </button>
 
       <!-- Notification Dropdown Panel -->
-      <div *ngIf="showNotificationPanel()" class="notif-panel">
+      <div *ngIf="showNotificationPanel()" class="notif-panel" (click)="$event.stopPropagation()">
         <div class="panel-header">
           <h3>Thông báo</h3>
-          <button *ngIf="unreadCount > 0" (click)="markAllNotificationsRead()" class="btn-text">
+          <button *ngIf="unreadCount > 0" (click)="markAllNotificationsRead($event)" class="btn-text">
             Đánh dấu đọc tất cả
           </button>
         </div>
@@ -46,14 +46,14 @@
     </div>
 
     <!-- User Profile Dropdown -->
-    <div *ngIf="user" class="user-dropdown-wrapper" (mouseleave)="closeUserMenu()">
-      <button (click)="toggleUserDropdown()" class="user-btn">
+    <div *ngIf="user" class="user-dropdown-wrapper">
+      <button (click)="toggleUserDropdown($event)" class="user-btn" id="btn-user-menu">
         <div class="avatar">{{ user.fullName ? user.fullName[0].toUpperCase() : 'U' }}</div>
         <span class="username">{{ user.fullName || user.username }}</span>
         <span class="arrow">▼</span>
       </button>
 
-      <div *ngIf="showUserMenu()" class="user-menu">
+      <div *ngIf="showUserMenu()" class="user-menu" (click)="$event.stopPropagation()">
         <div class="menu-header">
           <div class="menu-user-name">{{ user.fullName }}</div>
           <div class="menu-user-email">{{ user.email }}</div>

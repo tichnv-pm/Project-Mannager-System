@@ -35,7 +35,10 @@ export class HeaderComponent implements OnInit {
     }
   }
 
-  toggleNotifications(): void {
+  toggleNotifications(event?: Event): void {
+    if (event) {
+      event.stopPropagation();
+    }
     this.showUserMenu.set(false);
     const nextState = !this.showNotificationPanel();
     this.showNotificationPanel.set(nextState);
@@ -51,7 +54,10 @@ export class HeaderComponent implements OnInit {
     this.showNotificationPanel.set(false);
   }
 
-  toggleUserDropdown(): void {
+  toggleUserDropdown(event?: Event): void {
+    if (event) {
+      event.stopPropagation();
+    }
     this.showNotificationPanel.set(false);
     this.showUserMenu.set(!this.showUserMenu());
   }
@@ -62,10 +68,22 @@ export class HeaderComponent implements OnInit {
 
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent): void {
-    if (!this.elementRef.nativeElement.contains(event.target)) {
+    const target = event.target as HTMLElement;
+    const notifWrapper = this.elementRef.nativeElement.querySelector('.notif-wrapper');
+    const userWrapper = this.elementRef.nativeElement.querySelector('.user-dropdown-wrapper');
+
+    if (notifWrapper && !notifWrapper.contains(target)) {
       this.showNotificationPanel.set(false);
+    }
+    if (userWrapper && !userWrapper.contains(target)) {
       this.showUserMenu.set(false);
     }
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    this.showNotificationPanel.set(false);
+    this.showUserMenu.set(false);
   }
 
   onNotificationClick(item: NotificationItem): void {
@@ -76,7 +94,10 @@ export class HeaderComponent implements OnInit {
     }
   }
 
-  markAllNotificationsRead(): void {
+  markAllNotificationsRead(event?: Event): void {
+    if (event) {
+      event.stopPropagation();
+    }
     this.notificationService.markAllAsRead().subscribe(() => {
       const updated = this.notifications().map(n => ({ ...n, isRead: true }));
       this.notifications.set(updated);
