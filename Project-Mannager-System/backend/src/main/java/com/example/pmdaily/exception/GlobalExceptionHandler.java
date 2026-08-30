@@ -46,7 +46,8 @@ public class GlobalExceptionHandler {
                 .map(fe -> new FieldErrorItem(fe.getField(),
                         fe.getDefaultMessage() != null ? fe.getDefaultMessage() : "Giá trị không hợp lệ"))
                 .toList();
-        return build(ErrorCode.VALIDATION_ERROR, request, fieldErrors);
+        String primaryMessage = !fieldErrors.isEmpty() ? fieldErrors.get(0).message() : ErrorCode.VALIDATION_ERROR.getDefaultMessage();
+        return build(ErrorCode.VALIDATION_ERROR, request, fieldErrors, primaryMessage);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -55,7 +56,8 @@ public class GlobalExceptionHandler {
         List<FieldErrorItem> fieldErrors = ex.getConstraintViolations().stream()
                 .map(cv -> new FieldErrorItem(cv.getPropertyPath().toString(), cv.getMessage()))
                 .toList();
-        return build(ErrorCode.VALIDATION_ERROR, request, fieldErrors);
+        String primaryMessage = !fieldErrors.isEmpty() ? fieldErrors.get(0).message() : ErrorCode.VALIDATION_ERROR.getDefaultMessage();
+        return build(ErrorCode.VALIDATION_ERROR, request, fieldErrors, primaryMessage);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
@@ -163,12 +165,17 @@ public class GlobalExceptionHandler {
 
     private ResponseEntity<ErrorResponse> build(
             ErrorCode errorCode, HttpServletRequest request, List<FieldErrorItem> fieldErrors) {
+        return build(errorCode, request, fieldErrors, errorCode.getDefaultMessage());
+    }
+
+    private ResponseEntity<ErrorResponse> build(
+            ErrorCode errorCode, HttpServletRequest request, List<FieldErrorItem> fieldErrors, String customMessage) {
         HttpStatus status = errorCode.getStatus();
         ErrorResponse body = ErrorResponse.builder()
                 .status(status.value())
                 .error(standardErrorName(status))
                 .code(errorCode.name())
-                .message(errorCode.getDefaultMessage())
+                .message(customMessage != null ? customMessage : errorCode.getDefaultMessage())
                 .path(request.getRequestURI())
                 .fieldErrors(fieldErrors)
                 .traceId(resolveTraceId())

@@ -113,7 +113,7 @@ export class AdminPanelComponent implements OnInit {
       status: this.userStatusFilter || undefined,
     }).pipe(takeUntil(this.destroy$)).subscribe({
       next: res => { this.users.set(res.content || []); this.usersTotal.set(res.totalElements || 0); this.usersLoading.set(false); },
-      error: err => { this.usersLoading.set(false); this.usersError.set(err?.error?.message || 'Không thể tải danh sách người dùng'); }
+      error: err => { this.usersLoading.set(false); this.usersError.set(this.extractError(err, 'Không thể tải danh sách người dùng')); }
     });
   }
 
@@ -145,41 +145,76 @@ export class AdminPanelComponent implements OnInit {
     this.showUserModal.set(false);
   }
 
+  private extractError(err: any, fallback: string): string {
+    if (!err) return fallback;
+    if (err.fieldErrors && Array.isArray(err.fieldErrors) && err.fieldErrors.length > 0) {
+      return err.fieldErrors.map((f: any) => f.message).join('. ');
+    }
+    if (err.message) return err.message;
+    if (err.error?.fieldErrors && Array.isArray(err.error.fieldErrors) && err.error.fieldErrors.length > 0) {
+      return err.error.fieldErrors.map((f: any) => f.message).join('. ');
+    }
+    if (err.error?.message) return err.error.message;
+    return fallback;
+  }
+
   saveUser(): void {
     this.userFormError.set(null);
-    if (!this.userForm.fullName.trim()) { this.userFormError.set('Họ tên là bắt buộc'); return; }
-    if (!this.userForm.email.trim()) { this.userFormError.set('Email là bắt buộc'); return; }
+    const username = (this.userForm.username || '').trim();
+    const fullName = (this.userForm.fullName || '').trim();
+    const email = (this.userForm.email || '').trim();
+    const password = this.userForm.password || '';
+
+    if (!fullName) { this.userFormError.set('Họ tên là bắt buộc'); return; }
+    if (!email) { this.userFormError.set('Email là bắt buộc'); return; }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      this.userFormError.set('Email không đúng định dạng');
+      return;
+    }
 
     if (this.isEditMode()) {
       const u = this.users().find(x => x.id === this.editingUserId);
       if (!u) { this.userFormError.set('Người dùng không còn tồn tại'); return; }
       this.userSubmitting.set(true);
       this.adminService.updateUser(this.editingUserId, {
-        fullName: this.userForm.fullName.trim(),
-        email: this.userForm.email.trim(),
+        fullName,
+        email,
         roleIds: this.userForm.roleIds,
         version: u.version,
       }).pipe(takeUntil(this.destroy$)).subscribe({
         next: () => { this.userSubmitting.set(false); this.showUserModal.set(false); this.loadUsers(); },
-        error: err => { this.userSubmitting.set(false); this.userFormError.set(err?.error?.message || 'Cập nhật thất bại'); }
+        error: err => { this.userSubmitting.set(false); this.userFormError.set(this.extractError(err, 'Cập nhật thất bại')); }
       });
       return;
     }
 
-    if (!this.userForm.username.trim()) { this.userFormError.set('Tên đăng nhập là bắt buộc'); return; }
-    if (this.userForm.password.length < 8) { this.userFormError.set('Mật khẩu tối thiểu 8 ký tự (có chữ hoa, chữ thường, số, ký tự đặc biệt)'); return; }
+    if (!username) { this.userFormError.set('Tên đăng nhập là bắt buộc'); return; }
+    const usernameRegex = /^[a-zA-Z0-9._-]+$/;
+    if (!usernameRegex.test(username)) {
+      this.userFormError.set('Tên đăng nhập chỉ gồm chữ cái, số, dấu chấm, gạch dưới hoặc gạch ngang (không dấu, không khoảng trắng)');
+      return;
+    }
+
+    const strongPassword = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(password);
+    if (!password) { this.userFormError.set('Mật khẩu là bắt buộc'); return; }
+    if (!strongPassword) {
+      this.userFormError.set('Mật khẩu phải từ 8 ký tự, gồm ít nhất 1 chữ hoa, 1 chữ thường, 1 chữ số và 1 ký tự đặc biệt (VD: Member@123)');
+      return;
+    }
 
     this.userSubmitting.set(true);
     this.adminService.createUser({
-      username: this.userForm.username.trim(),
-      fullName: this.userForm.fullName.trim(),
-      email: this.userForm.email.trim(),
-      password: this.userForm.password,
+      username,
+      fullName,
+      email,
+      password,
       status: this.userForm.status as 'ACTIVE' | 'INACTIVE',
       roleIds: this.userForm.roleIds,
     }).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => { this.userSubmitting.set(false); this.showUserModal.set(false); this.loadUsers(); },
-      error: err => { this.userSubmitting.set(false); this.userFormError.set(err?.error?.message || 'Tạo người dùng thất bại'); }
+      error: err => { this.userSubmitting.set(false); this.userFormError.set(this.extractError(err, 'Tạo người dùng thất bại')); }
     });
   }
 
@@ -191,7 +226,7 @@ export class AdminPanelComponent implements OnInit {
     }
     this.adminService.changeUserStatus(u.id, next, u.version).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => this.loadUsers(),
-      error: err => this.usersError.set(err?.error?.message || 'Đổi trạng thái thất bại')
+      error: err => this.usersError.set(this.extractError(err, 'Đổi trạng thái thất bại'))
     });
   }
 
@@ -211,7 +246,7 @@ export class AdminPanelComponent implements OnInit {
     this.rolesError.set(null);
     this.adminService.getRoles().pipe(takeUntil(this.destroy$)).subscribe({
       next: res => { this.roles.set(res || []); this.availableRoles.set(res || []); this.rolesLoading.set(false); },
-      error: err => { this.rolesLoading.set(false); this.rolesError.set(err?.error?.message || 'Không thể tải vai trò'); }
+      error: err => { this.rolesLoading.set(false); this.rolesError.set(this.extractError(err, 'Không thể tải vai trò')); }
     });
   }
 
@@ -260,7 +295,7 @@ export class AdminPanelComponent implements OnInit {
         permissionCodes: [...this.editingRolePermissions],
       }).pipe(takeUntil(this.destroy$)).subscribe({
         next: () => { this.roleSaving.set(false); this.editingRoleId = ''; this.loadRoles(); },
-        error: err => { this.roleSaving.set(false); this.roleSaveMsg.set(err?.error?.message || 'Tạo vai trò thất bại'); }
+        error: err => { this.roleSaving.set(false); this.roleSaveMsg.set(this.extractError(err, 'Tạo vai trò thất bại')); }
       });
       return;
     }
@@ -273,7 +308,7 @@ export class AdminPanelComponent implements OnInit {
       permissionCodes: [...this.editingRolePermissions],
     }).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => { this.roleSaving.set(false); this.editingRoleId = ''; this.loadRoles(); },
-      error: err => { this.roleSaving.set(false); this.roleSaveMsg.set(err?.error?.message || 'Lưu vai trò thất bại'); }
+      error: err => { this.roleSaving.set(false); this.roleSaveMsg.set(this.extractError(err, 'Lưu vai trò thất bại')); }
     });
   }
 
@@ -288,7 +323,7 @@ export class AdminPanelComponent implements OnInit {
     this.deletingRoleSubmitting.set(true);
     this.adminService.deleteRole(this.deletingRoleId).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => { this.deletingRoleSubmitting.set(false); this.showDeleteRoleConfirm.set(false); this.loadRoles(); },
-      error: err => { this.deletingRoleSubmitting.set(false); this.rolesError.set(err?.error?.message || 'Xóa vai trò thất bại'); this.showDeleteRoleConfirm.set(false); }
+      error: err => { this.deletingRoleSubmitting.set(false); this.rolesError.set(this.extractError(err, 'Xóa vai trò thất bại')); this.showDeleteRoleConfirm.set(false); }
     });
   }
 
@@ -304,7 +339,7 @@ export class AdminPanelComponent implements OnInit {
     this.deletingUserSubmitting.set(true);
     this.adminService.deleteUser(this.deletingUserId).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => { this.deletingUserSubmitting.set(false); this.showDeleteUserConfirm.set(false); this.loadUsers(); },
-      error: err => { this.deletingUserSubmitting.set(false); this.usersError.set(err?.error?.message || 'Xóa người dùng thất bại'); this.showDeleteUserConfirm.set(false); }
+      error: err => { this.deletingUserSubmitting.set(false); this.usersError.set(this.extractError(err, 'Xóa người dùng thất bại')); this.showDeleteUserConfirm.set(false); }
     });
   }
 
@@ -323,15 +358,15 @@ export class AdminPanelComponent implements OnInit {
 
   submitResetPassword(): void {
     this.resetPasswordError.set(null);
-    const pwd = this.resetPasswordForm.newPassword;
+    const pwd = (this.resetPasswordForm.newPassword || '').trim();
     const strong = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(pwd);
     if (!pwd) { this.resetPasswordError.set('Mật khẩu mới là bắt buộc'); return; }
-    if (!strong) { this.resetPasswordError.set('Mật khẩu phải từ 8 ký tự, gồm chữ thường, chữ hoa, số và ký tự đặc biệt'); return; }
+    if (!strong) { this.resetPasswordError.set('Mật khẩu phải từ 8 ký tự, gồm ít nhất 1 chữ hoa, 1 chữ thường, 1 chữ số và 1 ký tự đặc biệt (VD: Member@123)'); return; }
 
     this.resetPasswordSubmitting.set(true);
     this.adminService.resetPassword(this.resetPasswordUserId, pwd).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => { this.resetPasswordSubmitting.set(false); this.showResetPasswordModal.set(false); },
-      error: err => { this.resetPasswordSubmitting.set(false); this.resetPasswordError.set(err?.error?.message || 'Đặt lại mật khẩu thất bại'); }
+      error: err => { this.resetPasswordSubmitting.set(false); this.resetPasswordError.set(this.extractError(err, 'Đặt lại mật khẩu thất bại')); }
     });
   }
 
@@ -358,7 +393,7 @@ export class AdminPanelComponent implements OnInit {
       entityType: this.auditEntityType || undefined,
     }).pipe(takeUntil(this.destroy$)).subscribe({
       next: res => { this.auditLogs.set(res.content || []); this.auditTotal.set(res.totalElements || 0); this.auditLoading.set(false); },
-      error: err => { this.auditLoading.set(false); this.auditError.set(err?.error?.message || 'Không thể tải nhật ký'); }
+      error: err => { this.auditLoading.set(false); this.auditError.set(this.extractError(err, 'Không thể tải nhật ký')); }
     });
   }
 

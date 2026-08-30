@@ -284,7 +284,10 @@
 
       <div class="form-group" *ngIf="!isEditMode()">
         <label>Mật khẩu <span class="req">*</span></label>
-        <input class="form-control" type="password" [(ngModel)]="userForm.password" placeholder="Tối thiểu 8 ký tự, có hoa/thường/số/ký tự đặc biệt">
+        <input class="form-control" type="password" [(ngModel)]="userForm.password" placeholder="Tối thiểu 8 ký tự (VD: Member@123)">
+        <small style="display: block; margin-top: 4px; color: #94a3b8; font-size: 0.75rem;">
+          Yêu cầu: Từ 8 ký tự, có ít nhất 1 chữ hoa, 1 chữ thường, 1 số và 1 ký tự đặc biệt (VD: <code>Admin@123</code>, <code>Member@123</code>).
+        </small>
       </div>
 
       <div class="form-group" *ngIf="!isEditMode()">
@@ -335,7 +338,10 @@
       <div class="alert-danger" *ngIf="resetPasswordError()">{{ resetPasswordError() }}</div>
       <div class="form-group">
         <label>Mật khẩu mới <span class="req">*</span></label>
-        <input class="form-control" type="password" [(ngModel)]="resetPasswordForm.newPassword" placeholder="Tối thiểu 8 ký tự, có hoa/thường/số/ký tự đặc biệt">
+        <input class="form-control" type="password" [(ngModel)]="resetPasswordForm.newPassword" placeholder="Tối thiểu 8 ký tự (VD: Member@123)">
+        <small style="display: block; margin-top: 4px; color: #94a3b8; font-size: 0.75rem;">
+          Yêu cầu: Từ 8 ký tự, có ít nhất 1 chữ hoa, 1 chữ thường, 1 số và 1 ký tự đặc biệt (VD: <code>Admin@123</code>, <code>Member@123</code>).
+        </small>
       </div>
     </div>
     <div class="modal-footer">
