@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Output, OnInit, inject, signal } from '@angular/core';
+import { Component, ElementRef, EventEmitter, HostListener, Output, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../core/auth/auth.service';
 import { NotificationItem, NotificationService } from '../../core/notification/notification.service';
@@ -13,6 +13,7 @@ import { NotificationItem, NotificationService } from '../../core/notification/n
 export class HeaderComponent implements OnInit {
   @Output() toggleSidebar = new EventEmitter<void>();
 
+  private elementRef = inject(ElementRef);
   authService = inject(AuthService);
   notificationService = inject(NotificationService);
 
@@ -46,9 +47,25 @@ export class HeaderComponent implements OnInit {
     }
   }
 
+  closeNotifications(): void {
+    this.showNotificationPanel.set(false);
+  }
+
   toggleUserDropdown(): void {
     this.showNotificationPanel.set(false);
     this.showUserMenu.set(!this.showUserMenu());
+  }
+
+  closeUserMenu(): void {
+    this.showUserMenu.set(false);
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    if (!this.elementRef.nativeElement.contains(event.target)) {
+      this.showNotificationPanel.set(false);
+      this.showUserMenu.set(false);
+    }
   }
 
   onNotificationClick(item: NotificationItem): void {

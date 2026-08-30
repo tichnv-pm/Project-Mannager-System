@@ -11,7 +11,7 @@
 
   <div class="header-right">
     <!-- Notification Bell -->
-    <div class="notif-wrapper">
+    <div class="notif-wrapper" (mouseleave)="closeNotifications()">
       <button (click)="toggleNotifications()" class="btn-icon notif-btn" title="Thông báo">
         🔔
         <span *ngIf="unreadCount > 0" class="badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
@@ -46,7 +46,7 @@
     </div>
 
     <!-- User Profile Dropdown -->
-    <div *ngIf="user" class="user-dropdown-wrapper">
+    <div *ngIf="user" class="user-dropdown-wrapper" (mouseleave)="closeUserMenu()">
       <button (click)="toggleUserDropdown()" class="user-btn">
         <div class="avatar">{{ user.fullName ? user.fullName[0].toUpperCase() : 'U' }}</div>
         <span class="username">{{ user.fullName || user.username }}</span>
