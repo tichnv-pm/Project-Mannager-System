@@ -18,6 +18,7 @@ import {
 } from './task.model';
 import { ProjectService } from '../projects/project.service';
 import { ProjectOption } from '../dashboard/dashboard.model';
+import { ProjectMemberResponse } from '../projects/project.model';
 import { UserBrief } from '../../core/models/auth.model';
 
 type QuickFilter = 'all' | 'my-tasks' | 'today' | 'overdue' | 'blocked';
@@ -68,6 +69,7 @@ export class TaskListComponent implements OnInit, OnDestroy {
   totalPages = signal(0);
   projectsList = signal<ProjectOption[]>([]);
   usersList = signal<UserBrief[]>([]);
+  projectMembers = signal<ProjectMemberResponse[]>([]);
 
   // ─── Filter State ─────────────────────────────────────────────────
   keyword = '';
@@ -126,6 +128,21 @@ export class TaskListComponent implements OnInit, OnDestroy {
       notes:       [''],
       estimateMinutes: [null],
       progress:    [0, [Validators.min(0), Validators.max(100)]],
+    });
+
+    this.taskForm.get('projectId')?.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(projectId => {
+      this.loadProjectMembers(projectId);
+    });
+  }
+
+  loadProjectMembers(projectId: string): void {
+    if (!projectId) {
+      this.projectMembers.set([]);
+      return;
+    }
+    this.projectService.getMembers(projectId).subscribe({
+      next: members => this.projectMembers.set(members || []),
+      error: () => this.projectMembers.set([])
     });
   }
 
@@ -339,14 +356,45 @@ export class TaskListComponent implements OnInit, OnDestroy {
     return map[status] || status;
   }
 
+  getRoleLabel(role: string): string {
+    const map: Record<string, string> = {
+      'PROJECT_MANAGER': 'PM',
+      'TECH_LEAD': 'Tech Lead',
+      'DEVELOPER': 'Developer',
+      'DEV': 'Developer',
+      'TESTER': 'Tester',
+      'BUSINESS_ANALYST': 'BA',
+      'BA': 'BA',
+      'DEVOPS': 'DevOps',
+      'MEMBER': 'Thành viên',
+      'PROJECT_MEMBER': 'Thành viên'
+    };
+    return map[role] || role;
+  }
+
+  private extractError(err: any, fallback: string): string {
+    if (!err) return fallback;
+    if (err.fieldErrors && Array.isArray(err.fieldErrors) && err.fieldErrors.length > 0) {
+      return err.fieldErrors.map((f: any) => f.message).join('. ');
+    }
+    if (err.message) return err.message;
+    if (err.error?.fieldErrors && Array.isArray(err.error.fieldErrors) && err.error.fieldErrors.length > 0) {
+      return err.error.fieldErrors.map((f: any) => f.message).join('. ');
+    }
+    if (err.error?.message) return err.error.message;
+    return fallback;
+  }
+
   // ─── Create / Edit Modal ─────────────────────────────────────────
 
   openCreateModal(): void {
     this.isEditMode.set(false);
     this.editingTaskId = null;
     this.formError.set(null);
+    const initialProjectId = this.selectedProjectId || (this.projectsList().length > 0 ? this.projectsList()[0].id : '');
+    this.loadProjectMembers(initialProjectId);
     this.taskForm.reset({
-      projectId:   this.selectedProjectId || (this.projectsList().length > 0 ? this.projectsList()[0].id : ''),
+      projectId:   initialProjectId,
       title: '', type: 'TASK', priority: 'MEDIUM',
       assigneeId: '', startDate: '', dueDate: '',
       description: '', notes: '', estimateMinutes: null, progress: 0,
@@ -358,22 +406,28 @@ export class TaskListComponent implements OnInit, OnDestroy {
     this.isEditMode.set(true);
     this.editingTaskId = task.id;
     this.formError.set(null);
-    this.taskService.getTask(task.id).subscribe(detail => {
-      this.editingVersion = detail.version;
-      this.taskForm.patchValue({
-        projectId:   detail.projectId,
-        title:       detail.title,
-        type:        detail.type,
-        priority:    detail.priority,
-        assigneeId:  detail.assignee?.id || '',
-        startDate:   detail.startDate || '',
-        dueDate:     detail.dueDate || '',
-        description: detail.description || '',
-        notes:       detail.notes || '',
-        estimateMinutes: detail.estimateMinutes ?? null,
-        progress:    detail.progress,
-      });
-      this.showModal.set(true);
+    this.taskService.getTask(task.id).subscribe({
+      next: detail => {
+        this.editingVersion = detail.version;
+        this.loadProjectMembers(detail.projectId);
+        this.taskForm.patchValue({
+          projectId:   detail.projectId,
+          title:       detail.title,
+          type:        detail.type,
+          priority:    detail.priority,
+          assigneeId:  detail.assignee?.id || '',
+          startDate:   detail.startDate || '',
+          dueDate:     detail.dueDate || '',
+          description: detail.description || '',
+          notes:       detail.notes || '',
+          estimateMinutes: detail.estimateMinutes ?? null,
+          progress:    detail.progress,
+        });
+        this.showModal.set(true);
+      },
+      error: err => {
+        this.error.set(this.extractError(err, 'Không thể tải chi tiết công việc'));
+      }
     });
   }
 
@@ -398,7 +452,7 @@ export class TaskListComponent implements OnInit, OnDestroy {
       };
       this.taskService.updateTask(this.editingTaskId, req as any).subscribe({
         next: () => { this.formSubmitting.set(false); this.closeModal(); this.loadTasks(); },
-        error: (err) => { this.formSubmitting.set(false); this.formError.set(err?.error?.message || 'Cập nhật thất bại'); }
+        error: (err) => { this.formSubmitting.set(false); this.formError.set(this.extractError(err, 'Cập nhật thất bại')); }
       });
     } else {
       this.taskService.createTask({
@@ -409,7 +463,7 @@ export class TaskListComponent implements OnInit, OnDestroy {
         progress: v.progress ?? 0,
       }).subscribe({
         next: () => { this.formSubmitting.set(false); this.closeModal(); this.loadTasks(); },
-        error: (err) => { this.formSubmitting.set(false); this.formError.set(err?.error?.message || 'Tạo mới thất bại'); }
+        error: (err) => { this.formSubmitting.set(false); this.formError.set(this.extractError(err, 'Tạo mới thất bại')); }
       });
     }
   }
@@ -492,8 +546,7 @@ export class TaskListComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.statusSubmitting.set(false);
-        const msg = err?.error?.message || err?.message || 'Chuyển trạng thái thất bại';
-        this.statusModalError.set(msg);
+        this.statusModalError.set(this.extractError(err, 'Chuyển trạng thái thất bại'));
       }
     });
   }
@@ -521,7 +574,7 @@ export class TaskListComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.deleteSubmitting.set(false);
-        alert(err?.error?.message || 'Xóa công việc thất bại');
+        alert(this.extractError(err, 'Xóa công việc thất bại'));
       }
     });
   }

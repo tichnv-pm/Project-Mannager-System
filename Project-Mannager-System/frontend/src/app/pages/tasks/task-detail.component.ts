@@ -45,6 +45,7 @@ export class TaskDetailComponent implements OnInit {
 
   taskId: string | null = null;
   usersList = signal<UserBrief[]>([]);
+  projectMembers = signal<ProjectMemberResponse[]>([]);
 
   // ─── Core Data ────────────────────────────────────────────────
   task = signal<TaskDetailResponse | null>(null);
@@ -135,15 +136,50 @@ export class TaskDetailComponent implements OnInit {
         this.task.set(detail);
         this.newProgress.set(detail.progress);
         this.loading.set(false);
+        if (detail.projectId) {
+          this.projectService.getMembers(detail.projectId).subscribe({
+            next: members => this.projectMembers.set(members || []),
+            error: () => this.projectMembers.set([])
+          });
+        }
         // Auto-load tab data
         this.loadComments();
         this.loadAttachments();
       },
       error: (err) => {
         this.loading.set(false);
-        this.error.set(err?.error?.message || err?.message || 'Không thể tải chi tiết công việc');
+        this.error.set(this.extractError(err, 'Không thể tải chi tiết công việc'));
       }
     });
+  }
+
+  getRoleLabel(role: string): string {
+    const map: Record<string, string> = {
+      'PROJECT_MANAGER': 'PM',
+      'TECH_LEAD': 'Tech Lead',
+      'DEVELOPER': 'Developer',
+      'DEV': 'Developer',
+      'TESTER': 'Tester',
+      'BUSINESS_ANALYST': 'BA',
+      'BA': 'BA',
+      'DEVOPS': 'DevOps',
+      'MEMBER': 'Thành viên',
+      'PROJECT_MEMBER': 'Thành viên'
+    };
+    return map[role] || role;
+  }
+
+  private extractError(err: any, fallback: string): string {
+    if (!err) return fallback;
+    if (err.fieldErrors && Array.isArray(err.fieldErrors) && err.fieldErrors.length > 0) {
+      return err.fieldErrors.map((f: any) => f.message).join('. ');
+    }
+    if (err.message) return err.message;
+    if (err.error?.fieldErrors && Array.isArray(err.error.fieldErrors) && err.error.fieldErrors.length > 0) {
+      return err.error.fieldErrors.map((f: any) => f.message).join('. ');
+    }
+    if (err.error?.message) return err.error.message;
+    return fallback;
   }
 
   loadComments(): void {
@@ -348,7 +384,7 @@ export class TaskDetailComponent implements OnInit {
       },
       error: (err) => {
         this.editSubmitting.set(false);
-        this.editError.set(err?.error?.message || 'Cập nhật thất bại');
+        this.editError.set(this.extractError(err, 'Cập nhật thất bại'));
       }
     });
   }

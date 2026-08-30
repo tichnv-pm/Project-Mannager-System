@@ -343,8 +343,13 @@
             <label>Người thực hiện</label>
             <select formControlName="assigneeId" class="form-control" id="form-task-assignee">
               <option value="">— Chưa gán —</option>
-              <option *ngFor="let u of usersList()" [value]="u.id">{{ u.fullName || u.username }}</option>
+              <option *ngFor="let m of projectMembers()" [value]="m.userId">
+                {{ m.fullName || m.username }} ({{ getRoleLabel(m.role) }})
+              </option>
             </select>
+            <small *ngIf="projectMembers().length === 0 && taskForm.get('projectId')?.value" style="font-size: 0.75rem; color: #f59e0b; margin-top: 4px; display: block;">
+              ⚠️ Dự án này chưa có thành viên. Hãy thêm thành viên vào dự án trước khi gán task.
+            </small>
           </div>
         </div>
 
