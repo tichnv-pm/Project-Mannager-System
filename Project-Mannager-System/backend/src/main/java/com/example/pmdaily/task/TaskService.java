@@ -279,45 +279,41 @@ public class TaskService {
     public TaskResponse update(UserPrincipal actor, UUID taskId, TaskUpdateRequest request) {
         Task task = findActive(taskId);
         Project project = task.getProject();
-        boolean manager = isAdminOrPm(actor) || isProjectManager(project, actor.getId());
+        ensureCanView(project, actor);
 
-        if (!manager) {
-            if (task.getAssignee() == null || !task.getAssignee().getId().equals(actor.getId())) {
-                throw new BusinessException(ErrorCode.ACCESS_DENIED);
-            }
-        }
         if (task.getVersion() != request.version()) {
             throw new ConflictException();
         }
 
-        if (manager) {
-            task.setTitle(request.title());
-            task.setDescription(request.description());
-            task.setPriority(request.priority() != null ? request.priority() : task.getPriority());
-            task.setType(request.type() != null ? request.type() : task.getType());
-            task.setSource(request.source() != null ? request.source() : task.getSource());
-            task.setStartDate(request.startDate());
-            task.setDueDate(request.dueDate());
-            task.setEstimateMinutes(request.estimateMinutes());
-            task.setEstimateUnit(request.estimateUnit() != null ? request.estimateUnit() : task.getEstimateUnit());
-            applyParent(task, request.parentTaskId(), actor);
-            validateDates(task);
-            if (request.assigneeId() != null) {
-                task.setAssignee(findProjectMemberUser(project, request.assigneeId()));
-            }
-            replaceCollaboratorsInternal(task,
-                    request.collaboratorIds() != null ? request.collaboratorIds() : List.of(), actor);
-            replaceWatchersInternal(task,
-                    request.watcherIds() != null ? request.watcherIds() : List.of(), actor);
-            replaceTagsInternal(task, request.tagIds() != null ? request.tagIds() : List.of(), actor);
-            if (request.sprintId() != null) {
-                sprintRepository.findByIdAndDeletedAtIsNull(request.sprintId())
-                        .filter(s -> s.getProjectId().equals(project.getId()))
-                        .orElseThrow(() -> new BusinessException(ErrorCode.BAD_REQUEST, "Sprint không hợp lệ cho dự án này"));
-                task.setSprintId(request.sprintId());
-            } else {
-                task.setSprintId(null);
-            }
+        task.setTitle(request.title());
+        task.setDescription(request.description());
+        task.setPriority(request.priority() != null ? request.priority() : task.getPriority());
+        task.setType(request.type() != null ? request.type() : task.getType());
+        task.setSource(request.source() != null ? request.source() : task.getSource());
+        task.setStartDate(request.startDate());
+        task.setDueDate(request.dueDate());
+        task.setEstimateMinutes(request.estimateMinutes());
+        task.setEstimateUnit(request.estimateUnit() != null ? request.estimateUnit() : task.getEstimateUnit());
+        applyParent(task, request.parentTaskId(), actor);
+        validateDates(task);
+        task.setAssignee(request.assigneeId() != null
+                ? findProjectMemberUser(project, request.assigneeId())
+                : null);
+
+        if (request.collaboratorIds() != null) {
+            replaceCollaboratorsInternal(task, request.collaboratorIds(), actor);
+        }
+        if (request.watcherIds() != null) {
+            replaceWatchersInternal(task, request.watcherIds(), actor);
+        }
+        if (request.tagIds() != null) {
+            replaceTagsInternal(task, request.tagIds(), actor);
+        }
+        if (request.sprintId() != null) {
+            sprintRepository.findByIdAndDeletedAtIsNull(request.sprintId())
+                    .filter(s -> s.getProjectId().equals(project.getId()))
+                    .orElseThrow(() -> new BusinessException(ErrorCode.BAD_REQUEST, "Sprint không hợp lệ cho dự án này"));
+            task.setSprintId(request.sprintId());
         }
 
         TaskStatus newStatus = request.status() != null ? request.status() : task.getStatus();
@@ -328,7 +324,7 @@ public class TaskService {
             }
             task.setProgress(request.progress());
         }
-        if (!manager && request.notes() != null) {
+        if (request.notes() != null) {
             task.setNotes(request.notes());
         }
 
@@ -363,7 +359,7 @@ public class TaskService {
     @Transactional
     public TaskResponse changeAssignee(UserPrincipal actor, UUID taskId, UUID assigneeId) {
         Task task = findActive(taskId);
-        ensureCanManage(task.getProject(), actor);
+        ensureCanView(task.getProject(), actor);
         UUID from = task.getAssignee() != null ? task.getAssignee().getId() : null;
         task.setAssignee(assigneeId != null
                 ? findProjectMemberUser(task.getProject(), assigneeId)
