@@ -97,4 +97,14 @@ GĐ3 (Agile/Quality nghiệp vụ) gồm 7 hạng mục, triển khai từng ph�
 
 **Kiểm tra:** backend 52/52 PASS trong `TaskIntegrationTest` (47 cũ + 5 mới) + `mvn test` toàn bộ; frontend `npm test` 73/73 PASS + `npm run build` thành công.
 
-**Chưa làm (6/7 hạng mục còn lại của GĐ3, chờ xác nhận tiếp theo):** Velocity (tính từ story_points + sprintId đã có), Burndown/Burnup chart, Definition of Done, Change Request mở rộng Scope–Schedule–Cost, KPI chất lượng (defect density/escape rate), Retrospective gắn sprintId. Chưa xây màn hình Backlog riêng (kéo-thả, nhóm theo Epic) — hiện tái dùng màn hình Task list có sẵn với filter `type=EPIC/STORY`.
+**Chưa làm (5/7 hạng mục còn lại của GĐ3, chờ xác nhận tiếp theo):** Definition of Done, Change Request mở rộng Scope–Schedule–Cost, KPI chất lượng (defect density/escape rate), Retrospective gắn sprintId. Chưa xây màn hình Backlog riêng (kéo-thả, nhóm theo Epic) — hiện tái dùng màn hình Task list có sẵn với filter `type=EPIC/STORY`.
+
+## Giai đoạn 3 (phần 2/7) — Velocity + Burndown (2026-11-11)
+
+**Velocity**: tính trực tiếp (live, không cache) từ `tasks.story_points` + `tasks.sprint_id` đã có — tổng/đã hoàn thành (status=DONE) story point + số task. API: `GET /sprints/{id}/velocity`, và `GET /projects/{projectId}/sprints/velocity-trend` (các sprint COMPLETED, sort theo endDate, cho biểu đồ xu hướng qua nhiều sprint).
+
+**Burndown**: **không** suy ngược từ audit log hiện có — không phải mọi đường cập nhật trạng thái task đều ghi before/after status nhất quán (ví dụ `update()` chung chỉ log `TASK_UPDATED` không kèm status cũ/mới), nên suy ngược sẽ ra số liệu sai. Thay vào đó dùng **snapshot hàng ngày** qua `SprintBurndownScheduler` (cron 02:15, cùng mẫu `EvmScheduler`/`project_financial_snapshots` đã có từ V18) — bảng `sprint_burndown_snapshots` (V21). Đường "lý tưởng" tính tại query-time (tuyến tính theo `sprint.startDate/endDate`, baseline = tổng điểm ở snapshot đầu tiên), không lưu trữ. **Giới hạn đã biết:** vì dựa trên snapshot, dữ liệu Burndown chỉ có từ ngày tính năng được bật trở đi — không có dữ liệu lịch sử cho sprint đã chạy trước đó (giống cách EVM snapshot hoạt động).
+
+**File tạo mới:** `backend/.../db/migration/V21__add_sprint_burndown_snapshots.sql`, `SprintBurndownSnapshot.java`, `SprintBurndownSnapshotRepository.java`, `SprintBurndownScheduler.java`, `dto/SprintVelocityResponse.java`, `dto/BurndownPointResponse.java`.
+**File cập nhật:** `SprintRepository.java` (+findByStatusAndDeletedAtIsNull), `SprintService.java` (+getVelocity/getVelocityTrend/getBurndown), `SprintController.java` (+3 endpoint), `SprintIntegrationTest.java` (+3 test), frontend `sprint.model.ts`/`sprint.service.ts` (+2 API), `project-sprints.component.ts/html/scss` (thay mock "capacity" cũ bằng Velocity thật + biểu đồ Burndown SVG tự vẽ cho sprint ACTIVE, không thêm thư viện chart).
+**Kiểm tra:** `SprintIntegrationTest` 4/4 PASS (1 cũ + 3 mới); `mvn test` toàn bộ backend; frontend `npm test` 73/73 + `npm run build` thành công.

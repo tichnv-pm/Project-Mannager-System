@@ -11,4 +11,5 @@ public interface SprintRepository extends JpaRepository<Sprint, UUID> {
     List<Sprint> findByProjectIdAndDeletedAtIsNull(UUID projectId);
     Optional<Sprint> findByIdAndDeletedAtIsNull(UUID id);
     boolean existsByProjectIdAndStatusAndDeletedAtIsNull(UUID projectId, SprintStatus status);
+    List<Sprint> findByStatusAndDeletedAtIsNull(SprintStatus status);
 }

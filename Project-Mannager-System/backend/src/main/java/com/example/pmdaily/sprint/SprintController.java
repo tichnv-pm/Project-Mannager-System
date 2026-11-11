@@ -9,9 +9,11 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import com.example.pmdaily.security.UserPrincipal;
+import com.example.pmdaily.sprint.dto.BurndownPointResponse;
 import com.example.pmdaily.sprint.dto.SprintCreateRequest;
 import com.example.pmdaily.sprint.dto.SprintResponse;
 import com.example.pmdaily.sprint.dto.SprintUpdateRequest;
+import com.example.pmdaily.sprint.dto.SprintVelocityResponse;
 
 import jakarta.validation.Valid;
 
@@ -59,5 +61,29 @@ public class SprintController {
             @AuthenticationPrincipal UserPrincipal actor,
             @PathVariable UUID id) {
         sprintService.deleteSprint(id, actor);
+    }
+
+    @GetMapping("/sprints/{id}/velocity")
+    @PreAuthorize("hasAuthority('project:view')")
+    public SprintVelocityResponse getVelocity(
+            @AuthenticationPrincipal UserPrincipal actor,
+            @PathVariable UUID id) {
+        return sprintService.getVelocity(id, actor);
+    }
+
+    @GetMapping("/sprints/{id}/burndown")
+    @PreAuthorize("hasAuthority('project:view')")
+    public List<BurndownPointResponse> getBurndown(
+            @AuthenticationPrincipal UserPrincipal actor,
+            @PathVariable UUID id) {
+        return sprintService.getBurndown(id, actor);
+    }
+
+    @GetMapping("/projects/{projectId}/sprints/velocity-trend")
+    @PreAuthorize("hasAuthority('project:view')")
+    public List<SprintVelocityResponse> getVelocityTrend(
+            @AuthenticationPrincipal UserPrincipal actor,
+            @PathVariable UUID projectId) {
+        return sprintService.getVelocityTrend(projectId, actor);
     }
 }

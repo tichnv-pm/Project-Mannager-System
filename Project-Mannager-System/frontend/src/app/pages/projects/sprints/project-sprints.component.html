@@ -44,15 +44,32 @@
           🎯 <strong>Mục tiêu:</strong> {{ sprint.goal }}
         </div>
 
-        <!-- Capacity Load -->
+        <!-- Capacity Load / Velocity -->
         <div class="sprint-capacity">
           <div class="cap-header">
-            <span>Khối lượng công việc:</span>
-            <span>{{ getSprintTasks(sprint.id).length }} công việc</span>
+            <span>Velocity:</span>
+            <span>{{ getSprintVelocity(sprint.id).completed }} / {{ getSprintVelocity(sprint.id).total }} story point ({{ getSprintTasks(sprint.id).length }} công việc)</span>
           </div>
           <div class="progress-bar-bg">
-            <div class="progress-bar-fill" [style.width.%]="getSprintTasks(sprint.id).length * 10 > 100 ? 100 : getSprintTasks(sprint.id).length * 10"></div>
+            <div class="progress-bar-fill"
+                 [style.width.%]="getSprintVelocity(sprint.id).total === 0 ? 0 : (getSprintVelocity(sprint.id).completed / getSprintVelocity(sprint.id).total * 100)"></div>
           </div>
+        </div>
+
+        <!-- Burndown chart (chỉ sprint ACTIVE) -->
+        <div class="sprint-burndown" *ngIf="sprint.status === 'ACTIVE' && burndown().length > 0">
+          <div class="cap-header"><span>Burndown:</span></div>
+          <svg viewBox="0 0 300 100" class="burndown-svg" preserveAspectRatio="none">
+            <path [attr.d]="burndownPath('idealRemainingStoryPoints')" class="burndown-ideal" />
+            <path [attr.d]="burndownPath('actualRemainingStoryPoints')" class="burndown-actual" />
+          </svg>
+          <div class="burndown-legend">
+            <span class="legend-ideal">— Lý tưởng</span>
+            <span class="legend-actual">— Thực tế</span>
+          </div>
+        </div>
+        <div class="sprint-burndown-empty" *ngIf="sprint.status === 'ACTIVE' && burndown().length === 0">
+          <small>Chưa có dữ liệu Burndown (snapshot chạy hàng ngày, chưa có snapshot nào từ khi Sprint bắt đầu).</small>
         </div>
 
         <!-- Droppable Task List -->

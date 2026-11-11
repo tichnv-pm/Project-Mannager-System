@@ -55,6 +55,10 @@ class SprintIntegrationTest {
     private TaskRepository taskRepository;
     @Autowired
     private com.example.pmdaily.project.ProjectRepository projectRepository;
+    @Autowired
+    private SprintRepository sprintRepository;
+    @Autowired
+    private SprintBurndownScheduler burndownScheduler;
 
     private String pmToken;
     private UUID projectId;
@@ -66,8 +70,8 @@ class SprintIntegrationTest {
             try (java.sql.Statement statement = con.createStatement()) {
                 statement.execute("SET REFERENTIAL_INTEGRITY FALSE");
                 String[] tables = {
-                        "refresh_tokens", "task_assignees", "tasks", "sprints", "project_members",
-                        "projects", "user_roles", "role_permissions", "permissions", "roles", "users"
+                        "refresh_tokens", "task_assignees", "tasks", "sprint_burndown_snapshots", "sprints",
+                        "project_members", "projects", "user_roles", "role_permissions", "permissions", "roles", "users"
                 };
                 for (String t : tables) {
                     try {
@@ -245,6 +249,102 @@ class SprintIntegrationTest {
 
         Task t2 = taskRepository.findById(unfinishedTask.getId()).orElseThrow();
         org.junit.jupiter.api.Assertions.assertNull(t2.getSprintId());
+    }
+
+    @Test
+    void velocity_computesFromStoryPointsAndDoneStatus() throws Exception {
+        UUID sprintId = createActiveSprint("Sprint Velocity", "2026-10-01", "2026-10-14");
+        com.example.pmdaily.project.Project project = projectRepository.findById(projectId).orElseThrow();
+        User pm = userRepository.findById(pmUserId).orElseThrow();
+
+        createSprintTask(project, pm, sprintId, "TSK-VEL-01", TaskStatus.DONE, 5);
+        createSprintTask(project, pm, sprintId, "TSK-VEL-02", TaskStatus.DONE, 3);
+        createSprintTask(project, pm, sprintId, "TSK-VEL-03", TaskStatus.IN_PROGRESS, 8);
+
+        mockMvc.perform(get("/api/v1/sprints/" + sprintId + "/velocity")
+                        .header("Authorization", "Bearer " + pmToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalStoryPoints").value(16))
+                .andExpect(jsonPath("$.completedStoryPoints").value(8))
+                .andExpect(jsonPath("$.totalTasks").value(3))
+                .andExpect(jsonPath("$.completedTasks").value(2));
+    }
+
+    @Test
+    void burndown_returnsSnapshotsWithIdealLine() throws Exception {
+        UUID sprintId = createActiveSprint("Sprint Burndown", "2026-10-01", "2026-10-11");
+        com.example.pmdaily.project.Project project = projectRepository.findById(projectId).orElseThrow();
+        User pm = userRepository.findById(pmUserId).orElseThrow();
+        Sprint sprint = sprintRepository.findByIdAndDeletedAtIsNull(sprintId).orElseThrow();
+
+        createSprintTask(project, pm, sprintId, "TSK-BD-01", TaskStatus.IN_PROGRESS, 10);
+        createSprintTask(project, pm, sprintId, "TSK-BD-02", TaskStatus.IN_PROGRESS, 10);
+        // Day 1 snapshot: nothing done yet
+        burndownScheduler.calculateAndSaveSnapshot(sprint, LocalDate.parse("2026-10-01"));
+
+        // Complete one task, day 6 snapshot (midpoint of a 10-day sprint)
+        Task t1 = taskRepository.findByCodeAndDeletedAtIsNull("TSK-BD-01").orElseThrow();
+        t1.setStatus(TaskStatus.DONE);
+        taskRepository.save(t1);
+        burndownScheduler.calculateAndSaveSnapshot(sprint, LocalDate.parse("2026-10-06"));
+
+        mockMvc.perform(get("/api/v1/sprints/" + sprintId + "/burndown")
+                        .header("Authorization", "Bearer " + pmToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].date").value("2026-10-01"))
+                .andExpect(jsonPath("$[0].actualRemainingStoryPoints").value(20))
+                .andExpect(jsonPath("$[0].idealRemainingStoryPoints").value(20.0))
+                .andExpect(jsonPath("$[1].date").value("2026-10-06"))
+                .andExpect(jsonPath("$[1].actualRemainingStoryPoints").value(10))
+                .andExpect(jsonPath("$[1].idealRemainingStoryPoints").value(10.0));
+    }
+
+    @Test
+    void burndown_noSnapshotsYet_returnsEmptyList() throws Exception {
+        UUID sprintId = createActiveSprint("Sprint Empty", "2026-11-01", "2026-11-14");
+
+        mockMvc.perform(get("/api/v1/sprints/" + sprintId + "/burndown")
+                        .header("Authorization", "Bearer " + pmToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    private UUID createActiveSprint(String name, String startDate, String endDate) throws Exception {
+        String json = """
+                {"sprintName":"%s","startDate":"%s","endDate":"%s","status":"ACTIVE","goal":"g"}
+                """.formatted(name, startDate, endDate);
+        MvcResult result = mockMvc.perform(post("/api/v1/projects/" + projectId + "/sprints")
+                        .header("Authorization", "Bearer " + pmToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"sprintName":"%s","startDate":"%s","endDate":"%s","goal":"g"}
+                                """.formatted(name, startDate, endDate)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        UUID sprintId = UUID.fromString(objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText());
+
+        mockMvc.perform(put("/api/v1/sprints/" + sprintId)
+                        .header("Authorization", "Bearer " + pmToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isOk());
+        return sprintId;
+    }
+
+    private void createSprintTask(com.example.pmdaily.project.Project project, User reporter, UUID sprintId,
+            String code, TaskStatus status, int storyPoints) {
+        Task task = new Task();
+        task.setProject(project);
+        task.setReporter(reporter);
+        task.setCode(code);
+        task.setTitle(code);
+        task.setStatus(status);
+        task.setSprintId(sprintId);
+        task.setStoryPoints(storyPoints);
+        task.setCreatedBy(pmUserId);
+        task.setUpdatedBy(pmUserId);
+        taskRepository.save(task);
     }
 
     private String login(String username) {

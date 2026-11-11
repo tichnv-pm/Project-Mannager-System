@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { SprintCreateRequest, SprintResponse, SprintUpdateRequest } from './sprint.model';
+import { BurndownPointResponse, SprintCreateRequest, SprintResponse, SprintUpdateRequest, SprintVelocityResponse } from './sprint.model';
 
 @Injectable({
   providedIn: 'root'
@@ -25,5 +25,13 @@ export class SprintService {
 
   public deleteSprint(sprintId: string): Observable<void> {
     return this.http.delete<void>(`${this.API_URL}/sprints/${sprintId}`);
+  }
+
+  public getVelocity(sprintId: string): Observable<SprintVelocityResponse> {
+    return this.http.get<SprintVelocityResponse>(`${this.API_URL}/sprints/${sprintId}/velocity`);
+  }
+
+  public getBurndown(sprintId: string): Observable<BurndownPointResponse[]> {
+    return this.http.get<BurndownPointResponse[]>(`${this.API_URL}/sprints/${sprintId}/burndown`);
   }
 }

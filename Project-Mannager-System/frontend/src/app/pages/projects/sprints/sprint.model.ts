@@ -24,3 +24,20 @@ export interface SprintUpdateRequest {
   status: SprintStatus;
   goal?: string;
 }
+
+export interface SprintVelocityResponse {
+  sprintId: string;
+  sprintName: string;
+  totalStoryPoints: number;
+  completedStoryPoints: number;
+  totalTasks: number;
+  completedTasks: number;
+}
+
+export interface BurndownPointResponse {
+  date: string;
+  totalStoryPoints: number;
+  completedStoryPoints: number;
+  actualRemainingStoryPoints: number;
+  idealRemainingStoryPoints: number;
+}

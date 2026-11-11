@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DragDropModule, CdkDragDrop, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
 import { SprintService } from './sprint.service';
-import { SprintResponse, SprintStatus } from './sprint.model';
+import { BurndownPointResponse, SprintResponse, SprintStatus } from './sprint.model';
 import { TaskService } from '../../tasks/task.service';
 import { TaskSummaryResponse, TaskUpdateRequest } from '../../tasks/task.model';
 import { HasPermissionDirective } from '../../../shared/directives/has-permission.directive';
@@ -34,6 +34,7 @@ export class ProjectSprintsComponent implements OnInit {
   sprints = signal<SprintResponse[]>([]);
   backlogTasks = signal<TaskSummaryResponse[]>([]);
   sprintTasksMap = signal<Record<string, TaskSummaryResponse[]>>({});
+  burndown = signal<BurndownPointResponse[]>([]);
 
   // Sprint Creation Modal
   showCreateModal = signal(false);
@@ -88,6 +89,7 @@ export class ProjectSprintsComponent implements OnInit {
                   if (loadedCount === sprints.length) {
                     this.sprintTasksMap.set(tempMap);
                     this.loading.set(false);
+                    this.loadBurndownForActiveSprint(sprints);
                   }
                 },
                 error: (err) => {
@@ -254,10 +256,45 @@ export class ProjectSprintsComponent implements OnInit {
     return this.sprintTasksMap()[sprintId] || [];
   }
 
-  getSprintHours(sprintId: string): number {
+  getSprintVelocity(sprintId: string): { total: number; completed: number } {
     const tasks = this.getSprintTasks(sprintId);
-    // estimateMinutes is not on TaskSummaryResponse directly, but let's assume it could be there or calculated
-    // We will do a safe fallback
-    return tasks.length * 2; // Simple mockup capacity, or sum it if we retrieve it. Let's keep it clean.
+    let total = 0;
+    let completed = 0;
+    for (const t of tasks) {
+      const points = t.storyPoints || 0;
+      total += points;
+      if (t.status === 'DONE') {
+        completed += points;
+      }
+    }
+    return { total, completed };
+  }
+
+  // ─── Burndown (Sprint ACTIVE) ──────────────────────────────────────
+
+  private loadBurndownForActiveSprint(sprints: SprintResponse[]): void {
+    const active = sprints.find(s => s.status === 'ACTIVE');
+    if (!active) {
+      this.burndown.set([]);
+      return;
+    }
+    this.sprintService.getBurndown(active.id).subscribe({
+      next: points => this.burndown.set(points || []),
+      error: () => this.burndown.set([])
+    });
+  }
+
+  burndownPath(key: 'actualRemainingStoryPoints' | 'idealRemainingStoryPoints'): string {
+    const points = this.burndown();
+    if (points.length === 0) return '';
+    const maxY = Math.max(...points.map(p => p.totalStoryPoints), 1);
+    const stepX = points.length > 1 ? 300 / (points.length - 1) : 0;
+    return points
+      .map((p, i) => {
+        const x = i * stepX;
+        const y = 100 - (p[key] / maxY) * 100;
+        return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+      })
+      .join(' ');
   }
 }

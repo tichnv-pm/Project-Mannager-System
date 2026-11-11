@@ -17,9 +17,11 @@ import com.example.pmdaily.project.ProjectMember;
 import com.example.pmdaily.project.ProjectMemberRepository;
 import com.example.pmdaily.project.ProjectMemberRole;
 import com.example.pmdaily.security.UserPrincipal;
+import com.example.pmdaily.sprint.dto.BurndownPointResponse;
 import com.example.pmdaily.sprint.dto.SprintCreateRequest;
 import com.example.pmdaily.sprint.dto.SprintResponse;
 import com.example.pmdaily.sprint.dto.SprintUpdateRequest;
+import com.example.pmdaily.sprint.dto.SprintVelocityResponse;
 import com.example.pmdaily.task.Task;
 import com.example.pmdaily.task.TaskRepository;
 import com.example.pmdaily.task.TaskStatus;
@@ -33,6 +35,7 @@ public class SprintService {
     private final SprintRepository sprintRepository;
     private final ProjectMemberRepository memberRepository;
     private final TaskRepository taskRepository;
+    private final SprintBurndownSnapshotRepository burndownSnapshotRepository;
 
     private void checkProjectViewAccess(UserPrincipal actor, UUID projectId) {
         if (actor.getRoles().contains("ADMIN")) {
@@ -145,6 +148,69 @@ public class SprintService {
         sprint.setDeletedAt(java.time.Instant.now());
         sprint.setDeletedBy(actor.getId());
         sprintRepository.save(sprint);
+    }
+
+    @Transactional(readOnly = true)
+    public SprintVelocityResponse getVelocity(UUID sprintId, UserPrincipal actor) {
+        Sprint sprint = sprintRepository.findByIdAndDeletedAtIsNull(sprintId)
+                .orElseThrow(() -> new ResourceNotFoundException("Sprint", sprintId));
+        checkProjectViewAccess(actor, sprint.getProjectId());
+        return computeVelocity(sprint);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SprintVelocityResponse> getVelocityTrend(UUID projectId, UserPrincipal actor) {
+        checkProjectViewAccess(actor, projectId);
+        return sprintRepository.findByProjectIdAndDeletedAtIsNull(projectId).stream()
+                .filter(s -> s.getStatus() == SprintStatus.COMPLETED)
+                .sorted(java.util.Comparator.comparing(Sprint::getEndDate))
+                .map(this::computeVelocity)
+                .toList();
+    }
+
+    private SprintVelocityResponse computeVelocity(Sprint sprint) {
+        List<Task> tasks = taskRepository.findBySprintIdAndDeletedAtIsNull(sprint.getId());
+        int total = 0;
+        int completed = 0;
+        int completedTasks = 0;
+        for (Task task : tasks) {
+            int points = task.getStoryPoints() != null ? task.getStoryPoints() : 0;
+            total += points;
+            if (task.getStatus() == TaskStatus.DONE) {
+                completed += points;
+                completedTasks++;
+            }
+        }
+        return new SprintVelocityResponse(sprint.getId(), sprint.getSprintName(),
+                total, completed, tasks.size(), completedTasks);
+    }
+
+    @Transactional(readOnly = true)
+    public List<BurndownPointResponse> getBurndown(UUID sprintId, UserPrincipal actor) {
+        Sprint sprint = sprintRepository.findByIdAndDeletedAtIsNull(sprintId)
+                .orElseThrow(() -> new ResourceNotFoundException("Sprint", sprintId));
+        checkProjectViewAccess(actor, sprint.getProjectId());
+
+        List<SprintBurndownSnapshot> snapshots =
+                burndownSnapshotRepository.findBySprintIdOrderBySnapshotDateAsc(sprintId);
+        if (snapshots.isEmpty()) {
+            return List.of();
+        }
+
+        int baselineTotal = snapshots.get(0).getTotalStoryPoints();
+        long totalSprintDays = Math.max(1, java.time.temporal.ChronoUnit.DAYS.between(
+                sprint.getStartDate(), sprint.getEndDate()));
+
+        return snapshots.stream()
+                .map(s -> {
+                    long elapsedDays = java.time.temporal.ChronoUnit.DAYS.between(
+                            sprint.getStartDate(), s.getSnapshotDate());
+                    double fractionElapsed = Math.min(1.0, Math.max(0.0, (double) elapsedDays / totalSprintDays));
+                    double idealRemaining = baselineTotal * (1.0 - fractionElapsed);
+                    return new BurndownPointResponse(s.getSnapshotDate(), s.getTotalStoryPoints(),
+                            s.getCompletedStoryPoints(), s.getRemainingStoryPoints(), idealRemaining);
+                })
+                .toList();
     }
 
     private SprintResponse toResponse(Sprint s) {
