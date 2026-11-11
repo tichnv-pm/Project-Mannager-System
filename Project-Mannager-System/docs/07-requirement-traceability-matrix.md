@@ -51,7 +51,7 @@
 | FR-TASK-09 | UC-005 | PATCH /api/v1/tasks/{id}/status | — |
 | FR-TASK-10 | UC-005 | POST/GET /api/v1/tasks/{id}/comments | — |
 | FR-TASK-11 | UC-005 | POST /api/v1/tasks/{id}/attachments | — |
-| FR-TASK-12 | UC-005 | POST /api/v1/tasks (parentTaskId) | — |
+| FR-TASK-12 | UC-005 | POST /api/v1/tasks (parentTaskId); PUT /api/v1/tasks/{id}/parent (đổi/gỡ parent, màn hình Backlog) | — |
 | FR-TASK-13 | UC-005 | GET /api/v1/tasks/{id}/history | — |
 | FR-TASK-14 | UC-005 | GET /api/v1/tasks/my-tasks | — |
 | FR-TASK-15 | UC-005 | GET /api/v1/tasks/today | — |

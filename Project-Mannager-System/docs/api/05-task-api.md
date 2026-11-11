@@ -38,6 +38,7 @@ TODO ──→ IN_PROGRESS ──→ REVIEW ──→ DONE
 | PUT | `/api/v1/tasks/{id}/progress` | `task:update` / assignee | Cập nhật tiến độ | FR-TASK-08 |
 | PUT | `/api/v1/tasks/{id}/blocker` | `task:update` / assignee | Đánh dấu blocker | FR-TASK-09 |
 | GET | `/api/v1/tasks/{id}/children` | `task:view` | Task con | FR-TASK-12 |
+| PUT | `/api/v1/tasks/{id}/parent` | `task:update` | Đổi/gỡ parent (Epic↔Story/Task) — màn hình Backlog kéo-thả, GĐ3 cải tiến | FR-TASK-12 |
 | PUT | `/api/v1/tasks/{id}/tags` | `task:update` | Gán tag | FR-TASK-02 |
 | PUT | `/api/v1/tasks/{id}/collaborators` | `task:assign` | Người phối hợp | FR-TASK-01 |
 | PUT | `/api/v1/tasks/{id}/watchers` | `task:update` | Người theo dõi | FR-TASK-01 |
@@ -194,7 +195,15 @@ TODO ──→ IN_PROGRESS ──→ REVIEW ──→ DONE
 - `PUT /collaborators`: `{ "userIds": [...] }` (`task:assign`) — thay thế toàn bộ; user phải thuộc project (`400 NOT_PROJECT_MEMBER`).
 - `PUT /watchers`: `{ "userIds": [...] }` (`task:update`) — thay thế toàn bộ.
 
-### 3.12 Bình luận
+### 3.12 PUT `/api/v1/tasks/{id}/parent`
+
+- **Phân quyền**: `task:update`, chỉ ADMIN/PM dự án (không có MEMBER partial như `update()`) — đổi hierarchy Epic/Story là hành động cấu trúc backlog, không phải field cá nhân task. Audit: có (`TASK_PARENT_CHANGED`). Dùng cho màn hình Backlog kéo-thả (GĐ3 cải tiến).
+- **Request body**: `{ "parentTaskId": "<uuid>" }` — `null` để gỡ hẳn parent (chuyển về "Chưa gán Epic").
+- **Response `200`** — `TaskResponse` (kèm `parentTaskId` mới).
+- **Lỗi**: `400 INVALID_EPIC_STORY_HIERARCHY` (BR-TASK-19), `400 PARENT_TASK_PROJECT_MISMATCH`, `400 CIRCULAR_PARENT`, `403 ACCESS_DENIED`, `404`.
+- **Lưu ý quan trọng (sửa cùng lúc với endpoint này):** trước đây `PUT /tasks/{id}` (3.5) coi `parentTaskId` thiếu/`null` trong body là "gỡ parent" — khác quy ước của các field quan hệ khác trong cùng request (`sprintId`, `collaboratorIds`, `watcherIds`, `tagIds`: thiếu/`null` = không đổi). Hệ quả: sửa bất kỳ field nào khác của 1 Story qua `PUT /tasks/{id}` mà không gửi lại `parentTaskId` sẽ vô tình gỡ Story khỏi Epic. Đã sửa `PUT /tasks/{id}` để cùng quy ước "`null` = không đổi"; muốn gỡ hẳn parent phải gọi đúng endpoint 3.12 này với `parentTaskId: null` tường minh.
+
+### 3.13 Bình luận
 
 | Endpoint | Body | Response | Lỗi |
 |---|---|---|---|
@@ -205,7 +214,7 @@ TODO ──→ IN_PROGRESS ──→ REVIEW ──→ DONE
 
 - Hậu điều kiện POST: notification `TASK_COMMENTED` cho assignee/watchers (trừ người viết). Audit: không (createdBy trên comment).
 
-### 3.13 File đính kèm
+### 3.14 File đính kèm
 
 | Endpoint | Body | Response | Ghi chú |
 |---|---|---|---|
@@ -215,7 +224,7 @@ TODO ──→ IN_PROGRESS ──→ REVIEW ──→ DONE
 
 - `AttachmentResponse`: `{ id, fileName, filePath (URL tải), contentType, sizeBytes, uploadedBy, createdAt }`. **Lỗi**: `413 PAYLOAD_TOO_LARGE`, `400` (sai mime type), `403`, `404`. Audit: có cho upload/delete.
 
-### 3.14 GET `/api/v1/tasks/{id}/history`
+### 3.15 GET `/api/v1/tasks/{id}/history`
 
 - **Phân quyền**: `task:view`.
 - **Response `200`** — `List<TaskHistoryEntry>` đọc từ `audit_logs` (entity_type = `TASK`, entity_id = taskId):
@@ -232,7 +241,7 @@ TODO ──→ IN_PROGRESS ──→ REVIEW ──→ DONE
 ]
 ```
 
-### 3.15 GET `/api/v1/tasks/export`
+### 3.16 GET `/api/v1/tasks/export`
 
 - **Phân quyền**: `task:export` (ADMIN, PM dự án). Audit: có (export).
 - **Query params**: như 3.1 (filter hiện tại).

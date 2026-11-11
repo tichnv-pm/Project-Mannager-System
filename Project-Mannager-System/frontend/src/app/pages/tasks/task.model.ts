@@ -24,6 +24,7 @@ export interface TaskSummaryResponse {
   projectId: string;
   projectCode: string;
   projectName: string;
+  parentTaskId?: string;
   title: string;
   status: TaskStatus;
   priority: TaskPriority;
@@ -87,6 +88,7 @@ export interface TaskCreateRequest {
 }
 
 export interface TaskUpdateRequest {
+  parentTaskId?: string;
   title: string;
   description?: string;
   notes?: string;

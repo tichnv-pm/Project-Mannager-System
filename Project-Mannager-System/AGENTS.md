@@ -158,3 +158,18 @@ Giá trị impact được tính và lưu **tại thời điểm tạo suggestio
 **Kiểm tra:** `PlanChangeLinkIntegrationTest` 10/10 PASS (8 cũ + 2 mới); `mvn test` toàn bộ backend; frontend `npm test` 73/73 PASS + `npm run build` thành công, không cảnh báo budget.
 
 **Còn lại 1/7 (tùy chọn, không phải hạng mục nghiệp vụ gốc):** màn hình Backlog riêng (kéo-thả, nhóm theo Epic) — hiện vẫn tái dùng màn hình Task list có sẵn với filter `type=EPIC/STORY`.
+
+## Giai đoạn 3 (phần 7/7, tùy chọn) — Màn hình Backlog kéo-thả theo Epic (2026-11-11)
+
+**Thiết kế:** thuần frontend (view mới, không entity/migration mới) — tab "📋 Backlog" trong Project Detail, mỗi cột là 1 Epic (+ cột "Chưa gán Epic"), card là Story/Task (không gồm Epic) nhóm theo `parentTaskId`, kéo-thả giữa cột để đổi Epic — cùng pattern CDK `DragDropModule`/`cdkDropListGroup` đã có ở `project-sprints.component`. Có thêm nhanh Epic/Story ngay trên board (tái dùng `TaskService.createTask`), không xây modal tạo task đầy đủ riêng (đã có ở Task list).
+
+**Lỗi phát hiện + sửa khi làm (ngoài phạm vi ban đầu nhưng bắt buộc phải sửa để tính năng kéo-thả đúng):** `TaskUpdateRequest`/`TaskSummaryResponse` ở frontend thiếu hẳn field `parentTaskId` dù backend đã có từ GĐ3 phần 1 — và nghiêm trọng hơn, `TaskService.update()` (backend) coi `parentTaskId` thiếu/`null` trong `PUT /tasks/{id}` là "gỡ parent", khác quy ước "`null` = không đổi" của các field quan hệ khác trong cùng method (`sprintId`, `collaboratorIds`, `watcherIds`, `tagIds`). Hệ quả thực tế: **sửa bất kỳ field nào của 1 Story qua màn hình Task list/Task detail (không gửi lại `parentTaskId`, vì frontend trước đây không biết field này tồn tại) sẽ vô tình gỡ Story khỏi Epic** — bug âm thầm có từ khi Epic/Story ra mắt (GĐ3 phần 1), chưa có test nào bắt được vì không có test nào update 1 task có parent rồi kiểm tra parent còn giữ. Đã sửa:
+- `TaskService.update()`: chỉ gọi `applyParent` khi `request.parentTaskId() != null` (cùng quy ước với field khác) — full update không còn vô tình gỡ parent.
+- Thêm endpoint riêng `PUT /tasks/{id}/parent` (`ParentUpdateRequest`, giống mẫu `/assignee`: không cần `version`) để đổi/gỡ parent **tường minh** — `parentTaskId: null` tường minh mới gỡ hẳn (dùng cho board kéo-thả "thả vào cột Chưa gán Epic"). Quyền: chỉ ADMIN/PM dự án (không có MEMBER partial).
+
+**File tạo mới:** `backend/.../task/dto/ParentUpdateRequest.java`, frontend `pages/projects/backlog/backlog-board.component.{ts,html,scss}`.
+**File cập nhật:** `TaskService.java` (fix `update()` + `changeParent()` mới), `TaskController.java` (+`PUT /{id}/parent`, sửa số endpoint 24→25), `TaskIntegrationTest.java` (+4 test: regression giữ parent khi update field khác, set/gỡ parent qua endpoint mới, 403 MEMBER, 400 hierarchy sai), frontend `task.model.ts` (+parentTaskId ở `TaskSummaryResponse`/`TaskUpdateRequest`), `task.service.ts` (+`changeParent`), `project-detail.component.ts/html` (+tab "Backlog"), docs: `docs/api/05-task-api.md` (+§3.12, renumber 3.12→3.16 cũ thành 3.13→3.16, lưu ý quy ước `null`), `docs/07-requirement-traceability-matrix.md` (FR-TASK-12).
+
+**Kiểm tra:** `TaskIntegrationTest` 58/58 PASS (54 cũ + 4 mới); `mvn test` toàn bộ backend; frontend `npm test` 73/73 PASS + `npm run build` thành công, không cảnh báo budget.
+
+**GĐ3 (Agile/Quality nghiệp vụ) — HOÀN TẤT 7/7 hạng mục** (Epic/Story/Backlog, Velocity/Burndown, Definition of Done, KPI chất lượng, Change Request Scope-Schedule-Cost, Retrospective gắn Sprint, màn hình Backlog kéo-thả).

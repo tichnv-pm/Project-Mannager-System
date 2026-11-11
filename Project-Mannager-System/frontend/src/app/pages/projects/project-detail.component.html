@@ -35,6 +35,9 @@
       <button class="tab-btn" [class.active]="activeTab === 'sprints'" (click)="activeTab = 'sprints'">
         🔄 Agile/Sprints
       </button>
+      <button class="tab-btn" [class.active]="activeTab === 'backlog'" (click)="activeTab = 'backlog'">
+        📋 Backlog
+      </button>
       <button class="tab-btn" [class.active]="activeTab === 'qa'" (click)="activeTab = 'qa'">
         🛡️ Chất lượng QA
       </button>
@@ -171,6 +174,11 @@
     <!-- Tab: Sprints -->
     <div *ngIf="activeTab === 'sprints'" class="tab-content">
       <app-project-sprints [projectId]="project()!.id"></app-project-sprints>
+    </div>
+
+    <!-- Tab: Backlog -->
+    <div *ngIf="activeTab === 'backlog'" class="tab-content">
+      <app-backlog-board [projectId]="project()!.id"></app-backlog-board>
     </div>
 
     <!-- Tab: QA -->

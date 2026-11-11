@@ -85,6 +85,11 @@ export class TaskService {
     return this.http.delete<void>(`${this.API_URL}/${id}`);
   }
 
+  /** Đổi/gỡ parent (Epic ↔ Story/Task) — dùng cho màn hình Backlog kéo-thả. null để gỡ hẳn. */
+  public changeParent(id: string, parentTaskId: string | null): Observable<TaskDetailResponse> {
+    return this.http.put<TaskDetailResponse>(`${this.API_URL}/${id}/parent`, { parentTaskId });
+  }
+
   // ─── Status / Progress / Blocker ─────────────────────────────────
 
   public updateStatus(id: string, req: TaskStatusRequest): Observable<TaskDetailResponse> {

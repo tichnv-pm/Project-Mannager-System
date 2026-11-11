@@ -557,6 +557,102 @@ class TaskIntegrationTest {
     }
 
     @Test
+    void update_withoutParentTaskId_doesNotClearExistingParent() throws Exception {
+        MvcResult epicResult = mockMvc.perform(post("/api/v1/tasks")
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"projectId":"%s","title":"Epic giữ liên kết","type":"EPIC"}
+                                """.formatted(projectId)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String epicId = objectMapper.readTree(epicResult.getResponse().getContentAsString()).get("id").asText();
+
+        MvcResult storyResult = mockMvc.perform(post("/api/v1/tasks")
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"projectId":"%s","title":"Story giữ liên kết","type":"STORY","parentTaskId":"%s"}
+                                """.formatted(projectId, epicId)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String storyId = objectMapper.readTree(storyResult.getResponse().getContentAsString()).get("id").asText();
+
+        // PUT update không gửi parentTaskId (vd. chỉ đổi priority) -> parent phải GIỮ NGUYÊN, không bị gỡ
+        mockMvc.perform(put("/api/v1/tasks/{id}", storyId)
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"Story giữ liên kết","priority":"HIGH","version":0}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.priority").value("HIGH"))
+                .andExpect(jsonPath("$.parentTaskId").value(epicId));
+    }
+
+    @Test
+    void changeParent_setAndClear_success() throws Exception {
+        MvcResult epicResult = mockMvc.perform(post("/api/v1/tasks")
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"projectId":"%s","title":"Epic backlog","type":"EPIC"}
+                                """.formatted(projectId)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String epicId = objectMapper.readTree(epicResult.getResponse().getContentAsString()).get("id").asText();
+        String storyId = createTask();
+
+        mockMvc.perform(put("/api/v1/tasks/{id}/parent", storyId)
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"parentTaskId\":\"" + epicId + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.parentTaskId").value(epicId));
+
+        // gỡ hẳn parent (chuyển về "Chưa gán Epic") -> parentTaskId null tường minh
+        mockMvc.perform(put("/api/v1/tasks/{id}/parent", storyId)
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"parentTaskId\":null}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.parentTaskId").doesNotExist());
+    }
+
+    @Test
+    void changeParent_byMember_returns403() throws Exception {
+        String taskId = createTask(projectId, memberId);
+
+        mockMvc.perform(put("/api/v1/tasks/{id}/parent", taskId)
+                        .header("Authorization", bearer(member()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"parentTaskId\":null}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+    }
+
+    @Test
+    void changeParent_storyUnderNonEpic_returns400() throws Exception {
+        MvcResult storyResult = mockMvc.perform(post("/api/v1/tasks")
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"projectId":"%s","title":"Story lẻ","type":"STORY"}
+                                """.formatted(projectId)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String storyId = objectMapper.readTree(storyResult.getResponse().getContentAsString()).get("id").asText();
+        String otherTaskId = createTask();
+
+        mockMvc.perform(put("/api/v1/tasks/{id}/parent", storyId)
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"parentTaskId\":\"" + otherTaskId + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_EPIC_STORY_HIERARCHY"));
+    }
+
+    @Test
     void update_member_onlyOwnAssignedTaskLimitedFields() throws Exception {
         String ownTask = createTask(projectId, memberId);
         String otherTask = createTask(projectId, pmUserId);

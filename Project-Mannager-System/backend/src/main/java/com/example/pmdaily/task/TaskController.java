@@ -34,6 +34,7 @@ import com.example.pmdaily.task.dto.AttachmentResponse;
 import com.example.pmdaily.task.dto.BlockerUpdateRequest;
 import com.example.pmdaily.task.dto.CommentRequest;
 import com.example.pmdaily.task.dto.CommentResponse;
+import com.example.pmdaily.task.dto.ParentUpdateRequest;
 import com.example.pmdaily.task.dto.ProgressUpdateRequest;
 import com.example.pmdaily.task.dto.StatusUpdateRequest;
 import com.example.pmdaily.task.dto.TagIdsRequest;
@@ -47,7 +48,7 @@ import com.example.pmdaily.task.dto.UserIdsRequest;
 import jakarta.validation.Valid;
 
 /**
- * API công việc (docs/api/05-task-api.md) — 24 endpoints, FR-TASK-01..17.
+ * API công việc (docs/api/05-task-api.md) — 25 endpoints, FR-TASK-01..17.
  * Quyền toàn cục qua @PreAuthorize; kiểm tra kép membership/PM dự án trong TaskService.
  */
 @RestController
@@ -181,6 +182,14 @@ public class TaskController {
             @PathVariable UUID id,
             @Valid @RequestBody AssigneeUpdateRequest request) {
         return taskService.changeAssignee(actor, id, request.assigneeId());
+    }
+
+    @PutMapping("/{id}/parent")
+    @PreAuthorize("hasAuthority('task:update')")
+    public TaskResponse changeParent(@AuthenticationPrincipal UserPrincipal actor,
+            @PathVariable UUID id,
+            @Valid @RequestBody ParentUpdateRequest request) {
+        return taskService.changeParent(actor, id, request.parentTaskId());
     }
 
     @PutMapping("/{id}/status")

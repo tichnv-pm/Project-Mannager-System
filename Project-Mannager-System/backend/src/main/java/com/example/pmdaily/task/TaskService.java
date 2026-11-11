@@ -304,7 +304,12 @@ public class TaskService {
             task.setEstimateMinutes(request.estimateMinutes());
             task.setEstimateUnit(request.estimateUnit() != null ? request.estimateUnit() : task.getEstimateUnit());
             task.setStoryPoints(request.storyPoints());
-            applyParent(task, request.parentTaskId(), actor);
+            // parentTaskId null = không đổi (cùng quy ước với sprintId/collaboratorIds bên dưới) — tránh gỡ
+            // nhầm Epic/parent của task mỗi khi sửa field khác không liên quan tới hierarchy. Đổi/gỡ parent
+            // tường minh dùng PUT /tasks/{id}/parent riêng (xem changeParent).
+            if (request.parentTaskId() != null) {
+                applyParent(task, request.parentTaskId(), actor);
+            }
             validateDates(task);
             task.setAssignee(request.assigneeId() != null
                     ? findProjectMemberUser(project, request.assigneeId())
@@ -379,6 +384,27 @@ public class TaskService {
         auditService.record("TASK_ASSIGNEE_CHANGED", ENTITY_TYPE, saved.getId(),
                 Map.of("assigneeId", String.valueOf(from)), Map.of("assigneeId", String.valueOf(assigneeId)));
         log.info("task.assignee id={} assigneeId={} actor={}", saved.getId(), assigneeId, actor.getUsername());
+        return toResponse(saved);
+    }
+
+    /**
+     * Đổi/gỡ parent (Epic ↔ Story/Task) — endpoint riêng cho màn hình Backlog kéo-thả, vì generic
+     * update() coi parentTaskId=null là "không đổi" (xem fix ở update()); muốn gỡ hẳn parent phải
+     * gọi endpoint này với parentTaskId=null tường minh. Chỉ admin/PM dự án (cùng quyền sửa full field).
+     */
+    @Transactional
+    public TaskResponse changeParent(UserPrincipal actor, UUID taskId, UUID parentTaskId) {
+        Task task = findActive(taskId);
+        Project project = task.getProject();
+        if (!isAdminOrPm(actor) && !isProjectManager(project, actor.getId())) {
+            throw new BusinessException(ErrorCode.ACCESS_DENIED);
+        }
+        UUID from = task.getParentTask() != null ? task.getParentTask().getId() : null;
+        applyParent(task, parentTaskId, actor);
+        Task saved = taskRepository.save(task);
+        auditService.record("TASK_PARENT_CHANGED", ENTITY_TYPE, saved.getId(),
+                Map.of("parentTaskId", String.valueOf(from)), Map.of("parentTaskId", String.valueOf(parentTaskId)));
+        log.info("task.parent id={} parentTaskId={} actor={}", saved.getId(), parentTaskId, actor.getUsername());
         return toResponse(saved);
     }
 

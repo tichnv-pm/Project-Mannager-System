@@ -13,6 +13,7 @@ import { ProjectWikiComponent } from './project-wiki.component';
 import { ProjectSprintsComponent } from './sprints/project-sprints.component';
 import { ProjectQaComponent } from './qa/project-qa.component';
 import { ProjectFinanceComponent } from './finance/project-finance.component';
+import { BacklogBoardComponent } from './backlog/backlog-board.component';
 
 @Component({
   selector: 'app-project-detail',
@@ -27,7 +28,8 @@ import { ProjectFinanceComponent } from './finance/project-finance.component';
     ProjectWikiComponent,
     ProjectSprintsComponent,
     ProjectQaComponent,
-    ProjectFinanceComponent
+    ProjectFinanceComponent,
+    BacklogBoardComponent
   ],
   templateUrl: './project-detail.component.html',
   styleUrls: ['./project-detail.component.scss']
@@ -46,7 +48,7 @@ export class ProjectDetailComponent implements OnInit {
   loading = signal(true);
   error = signal<string | null>(null);
 
-  activeTab: 'overview' | 'members' | 'wiki' | 'sprints' | 'qa' | 'finance' = 'overview';
+  activeTab: 'overview' | 'members' | 'wiki' | 'sprints' | 'backlog' | 'qa' | 'finance' = 'overview';
 
   // Member Modal State
   showMemberModal = signal(false);

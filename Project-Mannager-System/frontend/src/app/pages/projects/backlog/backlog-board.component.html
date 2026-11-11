@@ -1,0 +1,109 @@
+<div class="backlog-board">
+  <div class="header-actions">
+    <h3>📋 Backlog</h3>
+    <button *hasPermission="'task:create'" (click)="openAddEpic()" class="btn-primary">➕ Tạo Epic mới</button>
+  </div>
+
+  <p class="hint">
+    Kéo-thả Story/Task giữa các Epic để nhóm lại backlog. Epic/Story đã có sẵn ở màn hình Công việc
+    (filter theo loại) — màn hình này chỉ là góc nhìn kéo-thả theo Epic.
+  </p>
+
+  <div *ngIf="addingEpic()" class="quick-add-row">
+    <input type="text" class="form-control" placeholder="Tên Epic mới..." [(ngModel)]="newEpicTitle"
+           (keyup.enter)="confirmAddEpic()" autofocus />
+    <button (click)="confirmAddEpic()" class="btn-success-soft btn-sm" [disabled]="busy()">✔ Tạo</button>
+    <button (click)="cancelAddEpic()" class="btn-secondary btn-sm">✕ Hủy</button>
+  </div>
+
+  <div *ngIf="loading()" class="loading-state">
+    <div class="spinner"></div>
+    <p>Đang tải Backlog...</p>
+  </div>
+
+  <div *ngIf="error() && !loading()" class="error-state">
+    <p>⚠️ {{ error() }}</p>
+    <button (click)="load()" class="btn-secondary">Tải lại</button>
+  </div>
+
+  <div *ngIf="!loading() && !error()" class="board-columns" cdkDropListGroup>
+    <!-- Cột "Chưa gán Epic" luôn ở đầu -->
+    <div class="board-column unassigned-column">
+      <div class="col-head">
+        <span class="col-title">📥 Chưa gán Epic</span>
+        <span class="col-meta">{{ columnTasks(UNASSIGNED_KEY).length }} việc · {{ columnStoryPoints(UNASSIGNED_KEY) }} SP</span>
+      </div>
+
+      <div cdkDropList [cdkDropListData]="columnTasks(UNASSIGNED_KEY)" (cdkDropListDropped)="onDrop($event, UNASSIGNED_KEY)"
+           class="drop-list-zone">
+        <app-empty-state *ngIf="columnTasks(UNASSIGNED_KEY).length === 0"
+          title="Không có Story/Task nào" description="Kéo thẻ vào đây để gỡ khỏi Epic.">
+        </app-empty-state>
+        <div *ngFor="let t of columnTasks(UNASSIGNED_KEY)" cdkDrag class="task-card">
+          <div class="task-top">
+            <span class="type-badge type-{{ t.type | lowercase }}">{{ t.type }}</span>
+            <span class="task-code">{{ t.code }}</span>
+          </div>
+          <div class="task-title">{{ t.title }}</div>
+          <div class="task-footer">
+            <span class="task-status">{{ t.status }}</span>
+            <span *ngIf="t.storyPoints">⭐ {{ t.storyPoints }} SP</span>
+            <span *ngIf="t.assignee">👤 {{ t.assignee.fullName }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div *ngIf="addingStoryFor() === UNASSIGNED_KEY" class="quick-add-row">
+        <input type="text" class="form-control" placeholder="Tên Story mới..." [(ngModel)]="newStoryTitle"
+               (keyup.enter)="confirmAddStory(UNASSIGNED_KEY)" autofocus />
+        <button (click)="confirmAddStory(UNASSIGNED_KEY)" class="btn-success-soft btn-sm" [disabled]="busy()">✔</button>
+        <button (click)="cancelAddStory()" class="btn-secondary btn-sm">✕</button>
+      </div>
+      <button *ngIf="addingStoryFor() !== UNASSIGNED_KEY" (click)="openAddStory(UNASSIGNED_KEY)" class="btn-add-story">
+        ➕ Thêm Story
+      </button>
+    </div>
+
+    <!-- 1 cột / Epic -->
+    <div class="board-column" *ngFor="let epic of epics()">
+      <div class="col-head">
+        <span class="col-title">🎯 {{ epic.title }}</span>
+        <span class="col-meta">{{ columnTasks(epic.id).length }} việc · {{ columnStoryPoints(epic.id) }} SP</span>
+      </div>
+
+      <div cdkDropList [cdkDropListData]="columnTasks(epic.id)" (cdkDropListDropped)="onDrop($event, epic.id)"
+           class="drop-list-zone">
+        <app-empty-state *ngIf="columnTasks(epic.id).length === 0"
+          title="Epic chưa có Story/Task" description="Kéo thẻ vào đây hoặc thêm Story mới.">
+        </app-empty-state>
+        <div *ngFor="let t of columnTasks(epic.id)" cdkDrag class="task-card">
+          <div class="task-top">
+            <span class="type-badge type-{{ t.type | lowercase }}">{{ t.type }}</span>
+            <span class="task-code">{{ t.code }}</span>
+          </div>
+          <div class="task-title">{{ t.title }}</div>
+          <div class="task-footer">
+            <span class="task-status">{{ t.status }}</span>
+            <span *ngIf="t.storyPoints">⭐ {{ t.storyPoints }} SP</span>
+            <span *ngIf="t.assignee">👤 {{ t.assignee.fullName }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div *ngIf="addingStoryFor() === epic.id" class="quick-add-row">
+        <input type="text" class="form-control" placeholder="Tên Story mới..." [(ngModel)]="newStoryTitle"
+               (keyup.enter)="confirmAddStory(epic.id)" autofocus />
+        <button (click)="confirmAddStory(epic.id)" class="btn-success-soft btn-sm" [disabled]="busy()">✔</button>
+        <button (click)="cancelAddStory()" class="btn-secondary btn-sm">✕</button>
+      </div>
+      <button *ngIf="addingStoryFor() !== epic.id" (click)="openAddStory(epic.id)" class="btn-add-story">
+        ➕ Thêm Story
+      </button>
+    </div>
+
+    <app-empty-state *ngIf="epics().length === 0"
+      title="Dự án chưa có Epic nào"
+      description="Tạo Epic đầu tiên để bắt đầu nhóm backlog, hoặc để Story/Task nằm trong cột 'Chưa gán Epic'.">
+    </app-empty-state>
+  </div>
+</div>
