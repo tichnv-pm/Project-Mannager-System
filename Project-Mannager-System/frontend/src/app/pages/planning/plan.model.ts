@@ -620,6 +620,8 @@ export interface ChangeSuggestionCreateRequest {
   title: string;
   description: string;
   suggestedChanges: SuggestionChangeField[];
+  /** Đánh giá định tính tác động phạm vi, bắt buộc — GĐ3 cải tiến (PLN-RULE-CHG-06) */
+  scopeImpact: string;
 }
 
 export interface ChangeSuggestionResponse {
@@ -636,6 +638,11 @@ export interface ChangeSuggestionResponse {
   reviewedAt2?: string;
   createdBy?: string;
   createdAt: string;
+  scopeImpact: string;
+  /** Số ngày lệch tiến độ, tính tự động từ suggestedChanges — GĐ3 cải tiến (PLN-RULE-CHG-06) */
+  scheduleImpactDays: number;
+  /** Chi phí phát sinh, tính tự động từ delta effort x hourlyRate chủ task — GĐ3 cải tiến (PLN-RULE-CHG-06) */
+  costImpactAmount: number;
 }
 
 // ─── Template & Portfolio ───────────────────────────────────

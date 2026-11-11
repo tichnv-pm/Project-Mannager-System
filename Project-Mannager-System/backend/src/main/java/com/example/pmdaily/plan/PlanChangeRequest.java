@@ -65,4 +65,16 @@ public class PlanChangeRequest extends SoftDeleteEntity {
 
     @Column(name = "reviewed_at_2")
     private Instant reviewedAt2;
+
+    /** Đánh giá định tính tác động phạm vi — không suy ra được bằng số, PM phải ghi rõ (PLN-RULE-CHG-06). */
+    @Column(name = "scope_impact")
+    private String scopeImpact;
+
+    /** Số ngày lệch tiến độ, tính tự động từ suggestedChanges (plannedFinish/durationMinutes) khi tạo suggestion. */
+    @Column(name = "schedule_impact_days")
+    private int scheduleImpactDays = 0;
+
+    /** Chi phí phát sinh, tính tự động từ delta plannedEffortMinutes x hourlyRate chủ task (cùng công thức BAC EvmScheduler). */
+    @Column(name = "cost_impact_amount")
+    private double costImpactAmount = 0.0;
 }

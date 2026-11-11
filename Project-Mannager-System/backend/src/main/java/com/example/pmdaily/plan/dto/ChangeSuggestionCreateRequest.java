@@ -15,5 +15,6 @@ public record ChangeSuggestionCreateRequest(
         UUID sourceId,
         @NotBlank String title,
         @NotBlank String description,
-        @NotNull @Valid List<SuggestionChangeField> suggestedChanges) {
+        @NotNull @Valid List<SuggestionChangeField> suggestedChanges,
+        @NotBlank String scopeImpact) {
 }

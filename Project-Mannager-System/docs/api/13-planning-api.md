@@ -108,6 +108,8 @@ Phân hệ Project Planning: lập kế hoạch dự án (Master/Detail), WBS, d
 | POST | `/api/v1/change-suggestions/{id}/accept` | `plan:change` | Duyệt suggestion |
 | POST | `/api/v1/change-suggestions/{id}/reject` | `plan:change` | Từ chối |
 
+**Đánh giá tác động Scope-Schedule-Cost (GĐ3 cải tiến, PLN-RULE-CHG-06)** — `POST /change-suggestions` yêu cầu thêm field bắt buộc `scopeImpact` (string, đánh giá định tính tác động phạm vi do PM ghi, không suy ra được bằng số). Response (`ChangeSuggestionResponse`, cả GET list) có thêm `scopeImpact`, `scheduleImpactDays` (int, tính tự động: tổng lệch ngày từ các `suggestedChanges` có field `plannedFinish`/`durationMinutes`), `costImpactAmount` (double, tính tự động: tổng delta `plannedEffortMinutes` (giờ) × `hourlyRate` của chủ task — cùng công thức BAC đã dùng ở EVM `/projects/{id}/finance/evm`). Thiếu `scopeImpact` → `400 VALIDATION_ERROR`.
+
 ### 2.10 Portfolio
 
 | Method | Endpoint | Phân quyền | Mục đích |

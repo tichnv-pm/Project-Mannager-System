@@ -141,3 +141,20 @@ GĐ3 (Agile/Quality nghiệp vụ) gồm 7 hạng mục, triển khai từng ph�
 **Kiểm tra:** `MeetingIntegrationTest` 33/33 PASS (30 cũ + 3 mới); `mvn test` toàn bộ backend; frontend `npm test` 73/73 + `npm run build` thành công.
 
 **Còn lại 2/7 hạng mục của GĐ3:** Change Request mở rộng Scope–Schedule–Cost (module Planning, chưa đụng tới trong phiên này — rủi ro/phức tạp cao nhất), màn hình Backlog riêng (tùy chọn, không phải 1 trong 7 hạng mục nghiệp vụ gốc).
+
+## Giai đoạn 3 (phần 6/7) — Change Request mở rộng Scope–Schedule–Cost (2026-11-11)
+
+**Thiết kế:** mở rộng change suggestion (`plan_change_requests`, module Planning) có sẵn thay vì tạo entity mới — đây là cơ chế Change Request thật của hệ thống (PLN-RULE-CHG). Theo PMBOK, mọi đề xuất thay đổi cần đánh giá đồng thời 3 ràng buộc Scope-Schedule-Cost trước khi PM/ADMIN duyệt:
+
+- **Scope**: định tính, **không suy ra được bằng số** từ dữ liệu sẵn có → field `scopeImpact` bắt buộc PM tự ghi khi tạo suggestion (`400 VALIDATION_ERROR` nếu thiếu).
+- **Schedule**: tính tự động (`scheduleImpactDays`) từ chính các `suggestedChanges` đã gửi — cộng lệch ngày của field `plannedFinish` (so oldValue/newValue) và/hoặc `durationMinutes` (chia 480 phút/ngày làm việc, cùng hằng số `DEFAULT_DAILY_MINUTES` đã dùng ở `WorkingCalendar`/`SchedulingEngine`).
+- **Cost**: tính tự động (`costImpactAmount`) từ delta `plannedEffortMinutes` × `hourlyRate` của chủ task (`ProjectMember.hourlyRate`) — **tái dùng chính xác công thức BAC đã có ở `EvmScheduler`** (effort giờ × đơn giá/giờ), không phát sinh field giá/cost mới nào ở `PlanTask`/`ProjectPlan` (2 entity này không có field budget — đã xác nhận tra lại trước khi code). Field/task không có owner hoặc owner chưa có `hourlyRate` → cost impact phần đó tính là 0 (không chặn tạo suggestion, chỉ là ước lượng tham khảo cho người duyệt).
+
+Giá trị impact được tính và lưu **tại thời điểm tạo suggestion** (không tính lại khi accept), vì đây là bức tranh PM/ADMIN cần thấy để quyết định duyệt hay không — giữ nguyên lại trên record để truy vết sau này giống các field review khác.
+
+**File tạo mới:** `backend/.../db/migration/V24__add_plan_change_request_impact.sql`.
+**File cập nhật:** `PlanChangeRequest.java` (+scopeImpact, +scheduleImpactDays, +costImpactAmount), `ChangeSuggestionCreateRequest.java` (+scopeImpact bắt buộc), `ChangeSuggestionResponse.java` (+3 field), `PlanChangeService.java` (+computeScheduleImpactDays, +computeCostImpactAmount, gọi trong `createSuggestion`), `PlanChangeLinkIntegrationTest.java` (+2 test: bắt buộc scopeImpact, tính đúng schedule/cost impact; thêm quyền `financial:update` cho PM trong test để set hourlyRate qua API finance có sẵn), docs: `docs/planning/03-project-planning-business-rules.md` (+PLN-RULE-CHG-06), `docs/planning/14-planning-acceptance-criteria.md` (+PLN-AC-CHG-06), `docs/api/13-planning-api.md` §2.9. Frontend: `plan.model.ts` (+scopeImpact/scheduleImpactDays/costImpactAmount), `plan-change.component.ts/html/scss` (form field "Đánh giá tác động phạm vi" bắt buộc khi tạo suggestion + hiển thị 3 chip Scope/Schedule/Cost trên mỗi suggestion), `plan.service.spec.ts` (bổ sung scopeImpact vào payload test).
+
+**Kiểm tra:** `PlanChangeLinkIntegrationTest` 10/10 PASS (8 cũ + 2 mới); `mvn test` toàn bộ backend; frontend `npm test` 73/73 PASS + `npm run build` thành công, không cảnh báo budget.
+
+**Còn lại 1/7 (tùy chọn, không phải hạng mục nghiệp vụ gốc):** màn hình Backlog riêng (kéo-thả, nhóm theo Epic) — hiện vẫn tái dùng màn hình Task list có sẵn với filter `type=EPIC/STORY`.

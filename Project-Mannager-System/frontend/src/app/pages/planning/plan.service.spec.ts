@@ -546,7 +546,8 @@ describe('PlanService', () => {
       description: 'D',
       sourceType: 'ISSUE',
       sourceId: 'i1',
-      suggestedChanges: [{ entityType: 'PLAN_TASK', entityId: 't1', field: 'percentComplete', oldValue: '0', newValue: '50' }]
+      suggestedChanges: [{ entityType: 'PLAN_TASK', entityId: 't1', field: 'percentComplete', oldValue: '0', newValue: '50' }],
+      scopeImpact: 'Không ảnh hưởng phạm vi'
     }).subscribe();
     const req = httpMock.expectOne('/api/v1/plans/p1/change-suggestions');
     expect(req.request.method).toBe('POST');

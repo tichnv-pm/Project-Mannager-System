@@ -48,6 +48,15 @@
               <span *ngIf="s.reviewedAt">· duyệt 1: {{ s.reviewedAt | date:'dd/MM/yyyy HH:mm' }}</span>
               <span *ngIf="s.reviewedAt2">· duyệt 2: {{ s.reviewedAt2 | date:'dd/MM/yyyy HH:mm' }}</span>
             </div>
+            <div class="s-impact">
+              <span class="impact-chip">🎯 Phạm vi: {{ s.scopeImpact }}</span>
+              <span class="impact-chip" [class.impact-warn]="s.scheduleImpactDays !== 0">
+                📅 Tiến độ: {{ s.scheduleImpactDays > 0 ? '+' : '' }}{{ s.scheduleImpactDays }} ngày
+              </span>
+              <span class="impact-chip" [class.impact-warn]="s.costImpactAmount !== 0">
+                💰 Chi phí: {{ s.costImpactAmount > 0 ? '+' : '' }}{{ s.costImpactAmount | number:'1.0-2' }}
+              </span>
+            </div>
           </div>
           <div class="s-actions" *ngIf="s.status === 'PENDING'">
             <ng-container *hasPermission="'plan:change'">
@@ -151,6 +160,12 @@
           <div class="form-group">
             <label>Mô tả <span class="req">*</span></label>
             <textarea formControlName="description" rows="2" class="form-control" maxlength="1000"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Đánh giá tác động phạm vi (Scope) <span class="req">*</span></label>
+            <textarea formControlName="scopeImpact" rows="2" class="form-control" maxlength="1000"
+                      placeholder="VD: Không ảnh hưởng phạm vi / Thêm deliverable X..."></textarea>
+            <small class="valid-hint">Tiến độ (ngày) và chi phí phát sinh được tính tự động từ các field thay đổi dưới đây.</small>
           </div>
           <div class="form-row">
             <div class="form-group col">

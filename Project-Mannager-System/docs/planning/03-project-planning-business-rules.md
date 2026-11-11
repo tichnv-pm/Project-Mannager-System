@@ -115,6 +115,7 @@
 | PLN-RULE-CHG-03 | Ghi đủ: reason, requestedBy, approvedBy, changedAt, before/after JSON, affectedTaskIds. | BẮT BUỘC |
 | PLN-RULE-CHG-04 | Nếu change ảnh hưởng baseline trigger → tạo baseline mới (không sửa cũ). | BẮT BUỘC |
 | PLN-RULE-CHG-05 | Change phải có audit log. | BẮT BUỘC |
+| PLN-RULE-CHG-06 | Mọi change suggestion phải có đánh giá tác động Scope-Schedule-Cost: Scope do PM ghi rõ (định tính, bắt buộc, không suy ra được bằng số); Schedule/Cost tính tự động từ suggestedChanges (plannedFinish/durationMinutes/plannedEffortMinutes cũ-mới, cost dùng hourlyRate chủ task — cùng công thức BAC EvmScheduler). GĐ3 cải tiến (2026-11-11). | BẮT BUỘC |
 
 ## 11. Link (PLN-RULE-LINK)
 

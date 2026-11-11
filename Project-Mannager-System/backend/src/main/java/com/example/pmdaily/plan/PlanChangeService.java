@@ -107,6 +107,9 @@ public class PlanChangeService {
         suggestion.setDescription(request.description());
         suggestion.setSuggestedChanges(writeJson(request.suggestedChanges()));
         suggestion.setStatus(PlanChangeRequestStatus.PENDING);
+        suggestion.setScopeImpact(request.scopeImpact());
+        suggestion.setScheduleImpactDays(computeScheduleImpactDays(request.suggestedChanges()));
+        suggestion.setCostImpactAmount(computeCostImpactAmount(plan, request.suggestedChanges()));
         requestRepository.saveAndFlush(suggestion);
 
         auditService.record("PLAN_CHANGE_REQUESTED", "PLAN_CHANGE_REQUEST", suggestion.getId(),
@@ -260,6 +263,67 @@ public class PlanChangeService {
         }
     }
 
+    /**
+     * Tác động tiến độ (số ngày), tính từ các thay đổi plannedFinish/durationMinutes trong suggestedChanges
+     * (PLN-RULE-CHG-06) — không suy ra lịch toàn plan, chỉ cộng lệch của chính các field được đề xuất đổi.
+     */
+    private int computeScheduleImpactDays(List<SuggestionChangeField> changes) {
+        int totalDays = 0;
+        for (SuggestionChangeField change : changes) {
+            if (!"PLAN_TASK".equalsIgnoreCase(change.entityType())) {
+                continue;
+            }
+            try {
+                if ("plannedFinish".equals(change.field()) && isPresent(change.oldValue())) {
+                    totalDays += (int) java.time.temporal.ChronoUnit.DAYS.between(
+                            LocalDate.parse(change.oldValue()), LocalDate.parse(change.newValue()));
+                } else if ("durationMinutes".equals(change.field())) {
+                    long oldMinutes = isPresent(change.oldValue()) ? Long.parseLong(change.oldValue()) : 0L;
+                    long newMinutes = Long.parseLong(change.newValue());
+                    totalDays += Math.round((newMinutes - oldMinutes) / 480.0);
+                }
+            } catch (RuntimeException ignored) {
+                // giá trị không hợp lệ -> không tính vào ước lượng, vẫn cho tạo suggestion (ước lượng, không chặn)
+            }
+        }
+        return totalDays;
+    }
+
+    /**
+     * Tác động chi phí, tính từ delta plannedEffortMinutes x hourlyRate của chủ task — cùng công thức BAC
+     * đã dùng ở EvmScheduler (effort giờ x đơn giá), tái dùng ProjectMemberRepository có sẵn.
+     */
+    private double computeCostImpactAmount(ProjectPlan plan, List<SuggestionChangeField> changes) {
+        double total = 0.0;
+        for (SuggestionChangeField change : changes) {
+            if (!"PLAN_TASK".equalsIgnoreCase(change.entityType()) || !"plannedEffortMinutes".equals(change.field())) {
+                continue;
+            }
+            try {
+                int oldMinutes = isPresent(change.oldValue()) ? Integer.parseInt(change.oldValue()) : 0;
+                int newMinutes = Integer.parseInt(change.newValue());
+                PlanTask task = taskRepository
+                        .findByIdAndPlanIdAndDeletedAtIsNull(change.entityId(), plan.getId())
+                        .orElse(null);
+                if (task == null || task.getOwner() == null) {
+                    continue;
+                }
+                Double hourlyRate = memberRepository
+                        .findByProjectIdAndUser_Id(plan.getProject().getId(), task.getOwner().getId())
+                        .map(ProjectMember::getHourlyRate)
+                        .orElse(null);
+                total += ((newMinutes - oldMinutes) / 60.0) * (hourlyRate == null ? 0.0 : hourlyRate);
+            } catch (RuntimeException ignored) {
+                // giá trị không hợp lệ -> không tính vào ước lượng
+            }
+        }
+        return total;
+    }
+
+    private boolean isPresent(String value) {
+        return value != null && !value.isBlank() && !"null".equalsIgnoreCase(value);
+    }
+
     private long totalEffortMinutes(UUID planId) {
         return taskRepository.findByPlanIdAndDeletedAtIsNull(planId).stream()
                 .mapToLong(t -> t.getPlannedEffortMinutes() == null ? 0L : t.getPlannedEffortMinutes())
@@ -329,6 +393,7 @@ public class PlanChangeService {
                 suggestion.getSourceType(), suggestion.getSourceId(), suggestion.getTitle(),
                 suggestion.getDescription(), suggestion.getStatus().name(), suggestion.getReviewedBy(),
                 suggestion.getReviewedAt(), suggestion.getReviewedBy2(), suggestion.getReviewedAt2(),
-                suggestion.getCreatedBy(), suggestion.getCreatedAt());
+                suggestion.getCreatedBy(), suggestion.getCreatedAt(), suggestion.getScopeImpact(),
+                suggestion.getScheduleImpactDays(), suggestion.getCostImpactAmount());
     }
 }

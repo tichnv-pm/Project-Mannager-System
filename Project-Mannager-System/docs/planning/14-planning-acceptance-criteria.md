@@ -114,6 +114,7 @@
 | PLN-AC-CHG-03 | Từ chối suggestion → không apply |
 | PLN-AC-CHG-04 | Change history chứa field thay đổi, old/new, actor, thời gian |
 | PLN-AC-CHG-05 | Rollback (không có v1) → future refactor |
+| PLN-AC-CHG-06 | Tạo suggestion thiếu `scopeImpact` → `400`; response có `scopeImpact`, `scheduleImpactDays`, `costImpactAmount` (tính tự động, GĐ3 cải tiến) |
 
 ## PLN-AC-LINK
 

@@ -63,7 +63,8 @@ export class PlanChangeComponent implements OnInit {
       title: ['', [Validators.required, Validators.maxLength(200)]],
       description: ['', [Validators.required, Validators.maxLength(1000)]],
       sourceType: [''],
-      sourceId: ['']
+      sourceId: [''],
+      scopeImpact: ['', [Validators.required, Validators.maxLength(1000)]]
     });
     this.linkForm = this.fb.group({
       targetType: ['EXECUTION_TASK', Validators.required],
@@ -182,7 +183,8 @@ export class PlanChangeComponent implements OnInit {
       title: f.title,
       description: f.description,
       ...(f.sourceType ? { sourceType: f.sourceType, ...(f.sourceId ? { sourceId: f.sourceId } : {}) } : {}),
-      suggestedChanges
+      suggestedChanges,
+      scopeImpact: f.scopeImpact
     }).subscribe({
       next: () => {
         this.busy.set(false);

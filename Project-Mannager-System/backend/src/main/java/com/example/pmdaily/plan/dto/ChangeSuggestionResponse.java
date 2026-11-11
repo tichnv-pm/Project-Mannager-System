@@ -19,5 +19,8 @@ public record ChangeSuggestionResponse(
         UUID reviewedBy2,
         Instant reviewedAt2,
         UUID createdBy,
-        Instant createdAt) {
+        Instant createdAt,
+        String scopeImpact,
+        int scheduleImpactDays,
+        double costImpactAmount) {
 }

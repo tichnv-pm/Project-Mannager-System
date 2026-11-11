@@ -50,7 +50,8 @@ class PlanChangeLinkIntegrationTest {
             {"plan:view", "plan:create", "plan:update", "plan:delete", "plan:approve",
                     "plan:schedule", "plan:version", "plan:baseline", "plan:resource",
                     "plan:link", "plan:change",
-                    "task:create", "task:view", "issue:manage", "risk:manage", "milestone:manage"};
+                    "task:create", "task:view", "issue:manage", "risk:manage", "milestone:manage",
+                    "financial:view", "financial:update"};
     private static final String[] MEMBER_PERMS = {"plan:view"};
 
     @Autowired
@@ -70,6 +71,7 @@ class PlanChangeLinkIntegrationTest {
 
     private String projectId;
     private UUID pmUserId;
+    private String pmMemberId;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -110,6 +112,7 @@ class PlanChangeLinkIntegrationTest {
         projectId = createProject(adminToken(), "PRJ-CL", "Project Change Link Test");
         addMember(adminToken(), projectId, pm.getId(), ProjectMemberRole.PROJECT_MANAGER);
         addMember(adminToken(), projectId, member.getId(), ProjectMemberRole.MEMBER);
+        pmMemberId = memberIdFor(adminToken(), projectId, pm.getId());
         pmUserId = pm.getId();
         createDefaultCalendar(adminToken());
     }
@@ -378,7 +381,8 @@ class PlanChangeLinkIntegrationTest {
         mockMvc.perform(post("/api/v1/plans/" + planId + "/change-suggestions")
                         .header("Authorization", "Bearer " + member)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"title\":\"Hack\",\"description\":\"x\",\"suggestedChanges\":[]}"))
+                        .content("{\"title\":\"Hack\",\"description\":\"x\",\"suggestedChanges\":[],"
+                                + "\"scopeImpact\":\"Không ảnh hưởng\"}"))
                 .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/v1/change-suggestions/" + UUID.randomUUID() + "/accept")
                         .header("Authorization", "Bearer " + pm))
@@ -431,7 +435,10 @@ class PlanChangeLinkIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].status").value("PENDING"))
-                .andExpect(jsonPath("$[0].title").value("Task thay đổi"));
+                .andExpect(jsonPath("$[0].title").value("Task thay đổi"))
+                .andExpect(jsonPath("$[0].scopeImpact").value("Không ảnh hưởng phạm vi"))
+                .andExpect(jsonPath("$[0].scheduleImpactDays").value(0))
+                .andExpect(jsonPath("$[0].costImpactAmount").value(0.0));
         // member (plan:view + member project) xem được
         mockMvc.perform(get("/api/v1/plans/" + planId + "/change-suggestions")
                         .header("Authorization", "Bearer " + member))
@@ -444,6 +451,55 @@ class PlanChangeLinkIntegrationTest {
         mockMvc.perform(get("/api/v1/plans/" + UUID.randomUUID() + "/change-suggestions")
                         .header("Authorization", "Bearer " + pm))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void testSuggestion_Create_RequiresScopeImpact() throws Exception {
+        String pm = login("pm.cl", PASSWORD);
+        String planId = createPlan(pm, "CL-10", "2026-08-03");
+        createTask(pm, planId, "A", "Task A", "TASK", null, "{\"durationMinutes\":960}");
+
+        mockMvc.perform(post("/api/v1/plans/" + planId + "/change-suggestions")
+                        .header("Authorization", "Bearer " + pm)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"T\",\"description\":\"x\",\"suggestedChanges\":[]}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void testSuggestion_ComputesScheduleAndCostImpact() throws Exception {
+        String pm = login("pm.cl", PASSWORD);
+        // 100/giờ cho PM -> 480 phút (8h) effort tăng thêm = 800 chi phí phát sinh
+        mockMvc.perform(put("/api/v1/projects/" + projectId + "/finance/members/" + pmMemberId + "/rate")
+                        .header("Authorization", "Bearer " + pm)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"hourlyRate\":100}"))
+                .andExpect(status().isOk());
+
+        String planId = createPlan(pm, "CL-11", "2026-08-03");
+        String a = createTask(pm, planId, "A", "Task A", "TASK", null,
+                "{\"durationMinutes\":960,\"plannedEffortMinutes\":480,\"ownerId\":\"" + pmUserId + "\"}");
+        approve(pm, planId);
+
+        String suggestionId = createSuggestion(pm, planId, a,
+                "{\"entityType\":\"PLAN_TASK\",\"entityId\":\"" + a
+                        + "\",\"field\":\"plannedFinish\",\"oldValue\":\"2026-08-10\",\"newValue\":\"2026-08-15\"}");
+        mockMvc.perform(get("/api/v1/plans/" + planId + "/change-suggestions")
+                        .header("Authorization", "Bearer " + pm))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(suggestionId))
+                .andExpect(jsonPath("$[0].scheduleImpactDays").value(5))
+                .andExpect(jsonPath("$[0].costImpactAmount").value(0.0));
+
+        String suggestion2 = createSuggestion(pm, planId, a,
+                "{\"entityType\":\"PLAN_TASK\",\"entityId\":\"" + a
+                        + "\",\"field\":\"plannedEffortMinutes\",\"oldValue\":\"480\",\"newValue\":\"960\"}");
+        mockMvc.perform(post("/api/v1/change-suggestions/" + suggestion2 + "/accept")
+                        .header("Authorization", "Bearer " + pm))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("APPLIED"))
+                .andExpect(jsonPath("$.scheduleImpactDays").value(0))
+                .andExpect(jsonPath("$.costImpactAmount").value(800.0));
     }
 
     // ===================== helpers =====================
@@ -468,7 +524,8 @@ class PlanChangeLinkIntegrationTest {
             throws Exception {
         String body = "{\"title\":\"Task thay đổi\",\"description\":\"Suggestion test\","
                 + "\"sourceType\":\"ISSUE\",\"sourceId\":\"" + UUID.randomUUID()
-                + "\",\"suggestedChanges\":[" + singleChange + "]}";
+                + "\",\"suggestedChanges\":[" + singleChange + "],"
+                + "\"scopeImpact\":\"Không ảnh hưởng phạm vi\"}";
         MvcResult res = mockMvc.perform(post("/api/v1/plans/" + planId + "/change-suggestions")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -721,6 +778,21 @@ class PlanChangeLinkIntegrationTest {
                                 }
                                 """.formatted(userId, role)))
                 .andExpect(status().isCreated());
+    }
+
+    /** memberId (project_members.id) của 1 userId trong project, cần để gọi API finance rate. */
+    private String memberIdFor(String token, String prjId, UUID userId) throws Exception {
+        MvcResult res = mockMvc.perform(get("/api/v1/projects/" + prjId + "/finance/members")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode members = objectMapper.readTree(res.getResponse().getContentAsString());
+        for (JsonNode m : members) {
+            if (userId.toString().equals(m.path("userId").asText())) {
+                return m.path("memberId").asText();
+            }
+        }
+        throw new IllegalStateException("Không tìm thấy member cho userId=" + userId);
     }
 
     private String[] concat(String[] a, String[] b) {
