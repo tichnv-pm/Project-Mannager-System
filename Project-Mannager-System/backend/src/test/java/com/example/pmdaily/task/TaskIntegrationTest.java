@@ -83,6 +83,8 @@ class TaskIntegrationTest {
     private TagRepository tagRepository;
     @Autowired
     private TaskRepository taskRepository;
+    @Autowired
+    private com.example.pmdaily.dod.ProjectDodItemRepository dodItemRepository;
 
     private UUID adminId;
     private UUID pmUserId;
@@ -101,6 +103,7 @@ class TaskIntegrationTest {
                 statement.executeUpdate("DELETE FROM task_comments");
                 statement.executeUpdate("DELETE FROM attachments");
                 statement.executeUpdate("DELETE FROM tasks");
+                statement.executeUpdate("DELETE FROM project_dod_items");
                 statement.executeUpdate("DELETE FROM project_sequences");
                 statement.executeUpdate("DELETE FROM tags");
                 statement.executeUpdate("DELETE FROM project_members");
@@ -675,6 +678,80 @@ class TaskIntegrationTest {
                 .andExpect(jsonPath("$.status").value("DONE"))
                 .andExpect(jsonPath("$.progress").value(100))
                 .andExpect(jsonPath("$.actualCompletedAt").isNotEmpty());
+    }
+
+    @Test
+    void changeStatus_toDone_withActiveDod_requiresConfirmation() throws Exception {
+        com.example.pmdaily.dod.ProjectDodItem dodItem = new com.example.pmdaily.dod.ProjectDodItem();
+        dodItem.setProjectId(UUID.fromString(projectId));
+        dodItem.setText("Code đã được review");
+        dodItem.setDisplayOrder(0);
+        dodItem.setActive(true);
+        dodItem.setCreatedBy(pmUserId);
+        dodItem.setUpdatedBy(pmUserId);
+        dodItemRepository.save(dodItem);
+
+        String taskId = createTask();
+        mockMvc.perform(put("/api/v1/tasks/{id}/status", taskId)
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"status":"IN_PROGRESS"}
+                                """))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/v1/tasks/{id}/status", taskId)
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"status":"REVIEW"}
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/v1/tasks/{id}/status", taskId)
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"status":"DONE"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DOD_NOT_CONFIRMED"));
+
+        mockMvc.perform(put("/api/v1/tasks/{id}/status", taskId)
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"status":"DONE","dodConfirmed":true}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DONE"));
+    }
+
+    @Test
+    void changeStatus_toDone_withoutAnyDod_noConfirmationNeeded() throws Exception {
+        String taskId = createTask();
+        mockMvc.perform(put("/api/v1/tasks/{id}/status", taskId)
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"status":"IN_PROGRESS"}
+                                """))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/v1/tasks/{id}/status", taskId)
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"status":"REVIEW"}
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/v1/tasks/{id}/status", taskId)
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"status":"DONE"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DONE"));
     }
 
     @Test

@@ -13,5 +13,7 @@ public record StatusUpdateRequest(
         @NotNull(message = "Trạng thái không được để trống")
         TaskStatus status,
 
-        String blockerReason) {
+        String blockerReason,
+
+        Boolean dodConfirmed) {
 }

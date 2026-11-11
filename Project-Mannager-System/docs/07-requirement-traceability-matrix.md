@@ -153,6 +153,7 @@ Phân hệ v1.2 **chưa có** bộ tài liệu requirement/acceptance/traceabili
 | Agile/Sprints | §1.1, §2.1 | V14, V16 | `SprintController` (`/api/v1/...`) | `SprintIntegrationTest` |
 | Backlog (Epic/Story + story point) — GĐ3 cải tiến | BR-TASK-19 (docs/04) | V20 | `TaskController` filter `type=EPIC/STORY` | `TaskIntegrationTest` |
 | Velocity + Burndown (GĐ3 cải tiến) | — | V21 | `GET /sprints/{id}/velocity`, `/burndown`, `/projects/{id}/sprints/velocity-trend` | `SprintIntegrationTest` |
+| Definition of Done (GĐ3 cải tiến) | BR-TASK-20 (docs/04) | V22 | `ProjectDodItemController` (`/api/v1/projects/{id}/dod-items`), gate ở `PUT /tasks/{id}/status` | `ProjectDodItemIntegrationTest`, `TaskIntegrationTest` |
 | QA Testing (test case/run, auto-tạo Issue khi fail) | §2.1 | V15, V16 | `QaController` (`/api/v1/...`) | `QaIntegrationTest` |
 | Git Integration (webhook HMAC, auto chuyển trạng thái task) | §1.3 | V17 | `/api/v1/public/webhooks/git`, `/api/v1/tasks/{id}/git` | `GitWebhookIntegrationTest` |
 | Project Wiki (mẫu chuẩn hóa) | §1.5, §3.2, §3.3 | V12, V13 | `ProjectWikiController` (`/api/v1/...`) | `ProjectWikiIntegrationTest` |

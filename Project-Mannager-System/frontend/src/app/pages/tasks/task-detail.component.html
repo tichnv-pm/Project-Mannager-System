@@ -472,6 +472,16 @@
           <textarea [(ngModel)]="blockerReason" rows="3" class="form-control" id="blocker-reason-input" placeholder="Mô tả nguyên nhân..."></textarea>
         </div>
         <div *ngIf="newStatus === 'DONE'" class="alert alert-info">ℹ️ Tiến độ sẽ tự động đặt thành 100%.</div>
+        <div *ngIf="newStatus === 'DONE' && activeDodItems().length > 0" class="form-group dod-checklist">
+          <label>✅ Definition of Done</label>
+          <ul class="dod-list">
+            <li *ngFor="let item of activeDodItems()">{{ item.text }}</li>
+          </ul>
+          <label class="dod-confirm-label">
+            <input type="checkbox" [(ngModel)]="dodConfirmed" id="checkbox-dod-confirmed-detail" />
+            Tôi xác nhận đã đáp ứng đầy đủ Definition of Done ở trên
+          </label>
+        </div>
       </div>
       <div class="modal-footer">
         <button (click)="closeStatusModal()" class="btn-secondary">Hủy</button>

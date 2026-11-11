@@ -26,6 +26,7 @@ public enum ErrorCode {
     PARENT_TASK_PROJECT_MISMATCH(HttpStatus.BAD_REQUEST, "Công việc cha phải cùng dự án"),
     CIRCULAR_PARENT(HttpStatus.BAD_REQUEST, "Không thể tạo vòng lặp công việc cha–con"),
     INVALID_EPIC_STORY_HIERARCHY(HttpStatus.BAD_REQUEST, "Epic không thể có task cha; Story nếu có task cha thì phải là Epic"),
+    DOD_NOT_CONFIRMED(HttpStatus.BAD_REQUEST, "Dự án có Definition of Done — cần xác nhận đã đáp ứng trước khi hoàn thành công việc"),
     BLOCKER_REASON_REQUIRED(HttpStatus.BAD_REQUEST, "Phải nhập lý do blocker"),
     PROGRESS_REQUIRED_FOR_DONE(HttpStatus.BAD_REQUEST, "Tiến độ phải là 100 khi hoàn thành"),
     CODE_EXHAUSTED(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể sinh mã, vui lòng thử lại"),

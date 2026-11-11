@@ -19,6 +19,8 @@ import {
 import { ProjectService } from '../projects/project.service';
 import { ProjectOption } from '../dashboard/dashboard.model';
 import { ProjectMemberResponse } from '../projects/project.model';
+import { DodService } from '../projects/dod/dod.service';
+import { ProjectDodItemResponse } from '../projects/dod/dod.model';
 import { UserBrief } from '../../core/models/auth.model';
 
 type QuickFilter = 'all' | 'my-tasks' | 'today' | 'overdue' | 'blocked';
@@ -53,6 +55,7 @@ const KANBAN_COLUMNS: { key: TaskStatus; label: string; cls: string; icon: strin
 export class TaskListComponent implements OnInit, OnDestroy {
   private taskService = inject(TaskService);
   private projectService = inject(ProjectService);
+  private dodService = inject(DodService);
   private fb = inject(FormBuilder);
   private destroy$ = new Subject<void>();
 
@@ -106,6 +109,8 @@ export class TaskListComponent implements OnInit, OnDestroy {
   showStatusModal = signal(false);
   targetTask: TaskSummaryResponse | null = null;
   newStatus: TaskStatus = 'IN_PROGRESS';
+  activeDodItems = signal<ProjectDodItemResponse[]>([]);
+  dodConfirmed = false;
   blockerReason = '';
   statusModalError = signal<string | null>(null);
   statusSubmitting = signal(false);
@@ -500,6 +505,8 @@ export class TaskListComponent implements OnInit, OnDestroy {
     this.targetTask = task;
     this.blockerReason = task.blockerReason || '';
     this.statusModalError.set(null);
+    this.dodConfirmed = false;
+    this.activeDodItems.set([]);
 
     const statuses = this.getAllowedStatuses(task.status);
     this.allowedStatuses.set(statuses);
@@ -507,6 +514,11 @@ export class TaskListComponent implements OnInit, OnDestroy {
       ? defaultStatus
       : (statuses[0]?.value ?? 'IN_PROGRESS');
     this.showStatusModal.set(true);
+
+    this.dodService.list(task.projectId).subscribe({
+      next: items => this.activeDodItems.set((items || []).filter(i => i.active)),
+      error: () => this.activeDodItems.set([])
+    });
   }
 
   getAllowedStatuses(current: TaskStatus): { value: TaskStatus; label: string }[] {
@@ -558,10 +570,15 @@ export class TaskListComponent implements OnInit, OnDestroy {
       this.statusModalError.set('Vui lòng nhập lý do bị tắc nghẽn (Blocker Reason)');
       return;
     }
+    if (this.newStatus === 'DONE' && this.activeDodItems().length > 0 && !this.dodConfirmed) {
+      this.statusModalError.set('Vui lòng xác nhận đã đáp ứng Definition of Done trước khi hoàn thành.');
+      return;
+    }
     this.statusSubmitting.set(true);
     this.taskService.updateStatus(this.targetTask.id, {
       status: this.newStatus,
-      blockerReason: this.newStatus === 'BLOCKED' ? this.blockerReason : undefined
+      blockerReason: this.newStatus === 'BLOCKED' ? this.blockerReason : undefined,
+      dodConfirmed: this.newStatus === 'DONE' ? this.dodConfirmed : undefined
     }).subscribe({
       next: () => {
         this.statusSubmitting.set(false);

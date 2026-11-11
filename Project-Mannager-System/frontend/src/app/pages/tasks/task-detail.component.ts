@@ -8,6 +8,8 @@ import { PriorityChipComponent } from '../../shared/components/priority-chip.com
 import { HasPermissionDirective } from '../../shared/directives/has-permission.directive';
 import { ProjectService } from '../projects/project.service';
 import { ProjectMemberResponse } from '../projects/project.model';
+import { DodService } from '../projects/dod/dod.service';
+import { ProjectDodItemResponse } from '../projects/dod/dod.model';
 import { TaskService } from './task.service';
 import { GitService } from './git.service';
 import { GitCommitResponse, GitPullRequestResponse } from './git.model';
@@ -42,6 +44,7 @@ export class TaskDetailComponent implements OnInit {
   private router = inject(Router);
   private taskService = inject(TaskService);
   private projectService = inject(ProjectService);
+  private dodService = inject(DodService);
   private fb = inject(FormBuilder);
 
   taskId: string | null = null;
@@ -268,6 +271,8 @@ export class TaskDetailComponent implements OnInit {
   // ─── Status Change ───────────────────────────────────────────
 
   allowedStatuses = signal<{ value: TaskStatus; label: string }[]>([]);
+  activeDodItems = signal<ProjectDodItemResponse[]>([]);
+  dodConfirmed = false;
 
   openStatusModal(): void {
     const current = this.task()?.status ?? 'TODO';
@@ -276,7 +281,17 @@ export class TaskDetailComponent implements OnInit {
     this.newStatus = statuses[0]?.value ?? 'IN_PROGRESS';
     this.blockerReason = this.task()?.blockerReason || '';
     this.statusError.set(null);
+    this.dodConfirmed = false;
+    this.activeDodItems.set([]);
     this.showStatusModal.set(true);
+
+    const projectId = this.task()?.projectId;
+    if (projectId) {
+      this.dodService.list(projectId).subscribe({
+        next: items => this.activeDodItems.set((items || []).filter(i => i.active)),
+        error: () => this.activeDodItems.set([])
+      });
+    }
   }
 
   getAllowedStatuses(current: TaskStatus): { value: TaskStatus; label: string }[] {
@@ -325,10 +340,15 @@ export class TaskDetailComponent implements OnInit {
       this.statusError.set('Vui lòng nhập lý do bị tắc nghẽn');
       return;
     }
+    if (this.newStatus === 'DONE' && this.activeDodItems().length > 0 && !this.dodConfirmed) {
+      this.statusError.set('Vui lòng xác nhận đã đáp ứng Definition of Done trước khi hoàn thành.');
+      return;
+    }
     this.statusSubmitting.set(true);
     this.taskService.updateStatus(this.taskId, {
       status: this.newStatus,
-      blockerReason: this.newStatus === 'BLOCKED' ? this.blockerReason : undefined
+      blockerReason: this.newStatus === 'BLOCKED' ? this.blockerReason : undefined,
+      dodConfirmed: this.newStatus === 'DONE' ? this.dodConfirmed : undefined
     }).subscribe({
       next: (updated) => {
         this.task.set(updated);

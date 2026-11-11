@@ -70,6 +70,7 @@
 | BR-TASK-17 | Task có con thì xóa cha: xóa mềm cả cây con HOẶC chặn đến khi xóa con — chọn 1 | CHỜ XÁC NHẬN |
 | BR-TASK-18 | Export giới hạn 10.000 dòng | BẮT BUỘC |
 | BR-TASK-19 | Epic (`type=EPIC`) không có task cha; Story (`type=STORY`) nếu có task cha thì cha phải là Epic | BẮT BUỘC |
+| BR-TASK-20 | Nếu dự án có Definition of Done (ít nhất 1 tiêu chí active), chuyển task sang DONE bắt buộc `dodConfirmed=true`; dự án không có DoD thì không yêu cầu | BẮT BUỘC |
 
 ## 5. Cuộc họp (BR-MEET)
 

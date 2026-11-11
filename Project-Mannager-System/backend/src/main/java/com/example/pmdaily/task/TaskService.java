@@ -29,6 +29,7 @@ import com.example.pmdaily.audit.AuditLog;
 import com.example.pmdaily.audit.AuditLogRepository;
 import com.example.pmdaily.audit.AuditService;
 import com.example.pmdaily.common.ErrorCode;
+import com.example.pmdaily.dod.ProjectDodItemRepository;
 import com.example.pmdaily.sprint.SprintRepository;
 import com.example.pmdaily.common.PageResponse;
 import com.example.pmdaily.exception.BusinessException;
@@ -96,6 +97,7 @@ public class TaskService {
     private final TaskMapper taskMapper;
     private final SprintRepository sprintRepository;
     private final AuditService auditService;
+    private final ProjectDodItemRepository dodItemRepository;
 
     @Value("${app.storage.path:./uploads}")
     private String storagePath;
@@ -114,7 +116,8 @@ public class TaskService {
             TaskCodeGenerator codeGenerator,
             TaskMapper taskMapper,
             SprintRepository sprintRepository,
-            AuditService auditService) {
+            AuditService auditService,
+            ProjectDodItemRepository dodItemRepository) {
         this.taskRepository = taskRepository;
         this.tagRepository = tagRepository;
         this.assigneeRepository = assigneeRepository;
@@ -130,6 +133,7 @@ public class TaskService {
         this.taskMapper = taskMapper;
         this.sprintRepository = sprintRepository;
         this.auditService = auditService;
+        this.dodItemRepository = dodItemRepository;
     }
 
     // ------------------------------------------------------------------ CRUD
@@ -393,6 +397,11 @@ public class TaskService {
         if (!isTransitionAllowed(from, to)) {
             throw new BusinessException(ErrorCode.INVALID_STATUS_TRANSITION,
                     "Không thể chuyển trạng thái từ " + from + " sang " + to);
+        }
+        if (to == TaskStatus.DONE && from != TaskStatus.DONE
+                && dodItemRepository.existsByProjectIdAndActiveTrue(task.getProject().getId())
+                && !Boolean.TRUE.equals(request.dodConfirmed())) {
+            throw new BusinessException(ErrorCode.DOD_NOT_CONFIRMED);
         }
 
         if (to == TaskStatus.BLOCKED) {

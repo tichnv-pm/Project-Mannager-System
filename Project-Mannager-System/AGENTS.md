@@ -108,3 +108,13 @@ GĐ3 (Agile/Quality nghiệp vụ) gồm 7 hạng mục, triển khai từng ph�
 **File tạo mới:** `backend/.../db/migration/V21__add_sprint_burndown_snapshots.sql`, `SprintBurndownSnapshot.java`, `SprintBurndownSnapshotRepository.java`, `SprintBurndownScheduler.java`, `dto/SprintVelocityResponse.java`, `dto/BurndownPointResponse.java`.
 **File cập nhật:** `SprintRepository.java` (+findByStatusAndDeletedAtIsNull), `SprintService.java` (+getVelocity/getVelocityTrend/getBurndown), `SprintController.java` (+3 endpoint), `SprintIntegrationTest.java` (+3 test), frontend `sprint.model.ts`/`sprint.service.ts` (+2 API), `project-sprints.component.ts/html/scss` (thay mock "capacity" cũ bằng Velocity thật + biểu đồ Burndown SVG tự vẽ cho sprint ACTIVE, không thêm thư viện chart).
 **Kiểm tra:** `SprintIntegrationTest` 4/4 PASS (1 cũ + 3 mới); `mvn test` toàn bộ backend; frontend `npm test` 73/73 + `npm run build` thành công.
+
+## Giai đoạn 3 (phần 3/7) — Definition of Done (2026-11-11)
+
+**Thiết kế:** DoD là checklist text PM định nghĩa theo dự án (không theo dõi trạng thái check từng item/từng task — không phải quy trình QA test case, giữ đơn giản). Gate: chỉ khi chuyển task sang DONE qua `PUT /tasks/{id}/status` — nếu dự án có ≥1 tiêu chí active, bắt buộc `dodConfirmed=true` trong request, nếu không trả `400 DOD_NOT_CONFIRMED`. Dự án không cấu hình DoD thì không bị chặn gì (tính năng opt-in theo dự án). BR-TASK-20 (bắt buộc, docs/04).
+
+**File tạo mới:** package mới `com.example.pmdaily.dod` (`ProjectDodItem`, `ProjectDodItemRepository`, `ProjectDodItemService`, `ProjectDodItemController`, 3 DTO), `backend/.../db/migration/V22__add_project_dod_items.sql`, `ProjectDodItemIntegrationTest.java`, frontend `pages/projects/dod/{dod.model,dod.service}.ts`.
+**File cập nhật:** `ErrorCode.java` (+DOD_NOT_CONFIRMED), `StatusUpdateRequest.java` (+dodConfirmed), `TaskService.java` (gate trong `changeStatus()`), `TaskIntegrationTest.java` (+2 test), frontend `task.model.ts` (+dodConfirmed), `task-list.component.ts/html` + `task-detail.component.ts/html` (hiển thị checklist + checkbox xác nhận khi chuyển DONE), `styles.scss` (+`.dod-checklist`, dùng style chung thay vì thêm vào `task-list.component.scss` đã gần sát budget 16kB).
+**Kiểm tra:** `ProjectDodItemIntegrationTest` 6/6 PASS; `TaskIntegrationTest` 54/54 PASS (52 cũ + 2 mới); `mvn test` toàn bộ backend; frontend `npm test` 73/73 + `npm run build` thành công, không cảnh báo budget.
+
+**Chưa làm:** màn hình quản lý DoD cho PM (tạo/sửa/xóa tiêu chí) — hiện chỉ có API, chưa có UI riêng; PM cần dùng API trực tiếp (Swagger) cho tới khi làm màn hình cấu hình dự án.

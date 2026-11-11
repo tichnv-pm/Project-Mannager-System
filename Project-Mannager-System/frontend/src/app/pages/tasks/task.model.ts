@@ -111,6 +111,7 @@ export interface TaskUpdateRequest {
 export interface TaskStatusRequest {
   status: TaskStatus;
   blockerReason?: string;
+  dodConfirmed?: boolean;
 }
 
 export interface TaskProgressRequest {
