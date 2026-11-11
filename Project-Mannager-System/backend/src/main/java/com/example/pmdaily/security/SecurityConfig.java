@@ -32,10 +32,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
+    private final RateLimitFilter rateLimitFilter;
     private final ObjectMapper objectMapper;
 
-    public SecurityConfig(JwtAuthFilter jwtAuthFilter, ObjectMapper objectMapper) {
+    public SecurityConfig(JwtAuthFilter jwtAuthFilter, RateLimitFilter rateLimitFilter, ObjectMapper objectMapper) {
         this.jwtAuthFilter = jwtAuthFilter;
+        this.rateLimitFilter = rateLimitFilter;
         this.objectMapper = objectMapper;
     }
 
@@ -62,7 +64,8 @@ public class SecurityConfig {
                                 writeError(request, response, ErrorCode.ACCESS_DENIED)))
                 .headers(headers -> headers
                         .frameOptions(frame -> frame.deny()))
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(rateLimitFilter, JwtAuthFilter.class);
         return http.build();
     }
 

@@ -65,3 +65,20 @@ Theo kế hoạch cải tiến, đã sửa các điểm tài liệu lệch thự
 
 **File cập nhật:** `README.md`, `AGENTS.md`, `docs/00-project-overview.md`, `docs/01-business-requirements.md`, `docs/07-requirement-traceability-matrix.md`, `docs/design/03-frontend-architecture.md`, `docs/planning/13-gantt-ui-design.md`, `docs/release/03-release-notes.md`.
 **Kiểm tra:** chỉ sửa tài liệu, đối chiếu từng khẳng định với `frontend/package.json`, mã nguồn `frontend/src` (grep `mat-`), và test backend hiện có trước khi ghi là "đã chốt".
+
+## Giai đoạn 1 — CI/CD & Rate limiting (2026-11-11)
+
+Theo kế hoạch cải tiến, đã thêm pipeline CI và rate limit; nhân tiện phát hiện + sửa 2 lỗi nghiệp vụ thật đang chặn CI chạy xanh (không nằm trong phạm vi GĐ 1 ban đầu nhưng phải sửa để CI có ý nghĩa):
+
+- **CI/CD**: `.github/workflows/ci.yml` (ở gốc repo, ngoài thư mục `Project-Mannager-System/`) — job `backend` chạy `mvn -B clean verify` (JDK 21 temurin), job `frontend` chạy `npm ci` + `npm test` + `npm run build` (Node 22). Trước đây chưa có CI nào, mọi "đã kiểm chứng" là thủ công.
+- **Rate limiting**: `RateLimitFilter` (in-memory, theo IP, sliding window, không thêm dependency mới) áp cho `/api/v1/auth/login` và `/api/v1/public/webhooks/**` — 2 endpoint `permitAll()` duy nhất, trước đây không có giới hạn nào ngoài login-lockout theo tài khoản. Mặc định 20 req/60s (login) và 60 req/60s (webhook), cấu hình qua env (`RATE_LIMIT_*`), **tắt ở profile `test`** để không phá test hiện có. Vượt giới hạn → 429 `RATE_LIMIT_EXCEEDED`.
+- **Lỗi phát hiện khi chạy `mvn clean verify`/`npm run build` thật (ngoài phạm vi GĐ 1, đã sửa vì chặn CI xanh):**
+  - `TaskService.update()` đã mất field-limiting cho MEMBER (vi phạm BR-TASK-13 bắt buộc) — bất kỳ ai `ensureCanView` được là sửa toàn bộ field của task bất kỳ. Khôi phục: dùng `ensureCanUpdateOrAssignee` + chỉ admin/PM mới sửa full field, MEMBER chỉ sửa status/progress/notes trên task được giao cho mình.
+  - `applyStatusRules()` không còn throw `BLOCKER_REASON_REQUIRED` khi block task mà không có lý do (tự động điền "Tắc nghẽn" thay vì từ chối) — khôi phục throw khi chưa có lý do nào (giữ nguyên hành vi "giữ lý do cũ nếu không gửi lại" cho task đã blocked từ trước).
+  - Frontend: `task-detail.component.ts` thiếu import `ProjectMemberResponse` → `npm run build` thật sự fail dù test vẫn pass (Vitest không chạy qua `tsc` strict như `ng build`).
+
+**File tạo mới:** `.github/workflows/ci.yml`, `backend/src/main/java/com/example/pmdaily/security/RateLimitFilter.java`, `backend/src/test/java/com/example/pmdaily/security/RateLimitFilterIntegrationTest.java`.
+**File cập nhật:** `backend/src/main/java/com/example/pmdaily/common/ErrorCode.java`, `backend/src/main/java/com/example/pmdaily/security/SecurityConfig.java`, `backend/src/main/java/com/example/pmdaily/task/TaskService.java`, `backend/src/main/resources/application.yml`, `application-test.yml`, `frontend/src/app/pages/tasks/task-detail.component.ts`.
+**Kiểm tra:** `mvn test` toàn bộ backend — 297/297 PASS (295 cũ + 2 test rate-limit mới); `npm test` frontend — 73/73 PASS; `npm run build` frontend — thành công sau khi thêm import còn thiếu.
+
+**Chưa làm trong GĐ 1 (để lại, có lý do):** chuyển test backend sang Testcontainers Postgres — môi trường phiên này không có Docker daemon chạy, không thể verify nếu làm; dọn migration demo-data lẫn trong lịch sử Flyway thật (V7–V10) — rủi ro cao, cần kế hoạch riêng; tăng coverage test component frontend — khối lượng lớn, để giai đoạn sau.

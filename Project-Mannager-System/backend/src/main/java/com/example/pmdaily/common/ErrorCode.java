@@ -34,6 +34,7 @@ public enum ErrorCode {
     INVALID_LOGIN(HttpStatus.UNAUTHORIZED, "Tên đăng nhập hoặc mật khẩu không đúng"),
     ACCOUNT_INACTIVE(HttpStatus.UNAUTHORIZED, "Tên đăng nhập hoặc mật khẩu không đúng"),
     ACCOUNT_LOCKED(HttpStatus.LOCKED, "Tài khoản bị khóa tạm thời do nhập sai nhiều lần, vui lòng thử lại sau"),
+    RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "Quá nhiều yêu cầu, vui lòng thử lại sau"),
     MALFORMED_JSON(HttpStatus.BAD_REQUEST, "Dữ liệu gửi lên không đúng định dạng"),
     MISSING_PARAMETER(HttpStatus.BAD_REQUEST, "Thiếu tham số bắt buộc"),
     TYPE_MISMATCH(HttpStatus.BAD_REQUEST, "Giá trị tham số không đúng kiểu"),

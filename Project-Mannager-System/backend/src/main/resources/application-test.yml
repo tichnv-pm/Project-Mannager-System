@@ -15,5 +15,8 @@ app:
     secret: test-secret-at-least-32-chars-long!!
   storage:
     path: target/test-uploads
+  security:
+    rate-limit:
+      enabled: false
   webhook:
     git-secret: git-webhook-secret-key-12345
