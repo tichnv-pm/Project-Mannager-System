@@ -21,9 +21,9 @@
 
 `LOW`, `MEDIUM`, `HIGH`, `CRITICAL` — mặc định `MEDIUM`.
 
-### 1.3 Loại công việc (TaskType) — *cần xác nhận*
+### 1.3 Loại công việc (TaskType)
 
-`FEATURE`, `BUG`, `IMPROVEMENT`, `TASK`, `OTHER` — mặc định `TASK`.
+`EPIC`, `STORY`, `FEATURE`, `BUG`, `IMPROVEMENT`, `TASK`, `OTHER` — mặc định `TASK`. `EPIC`/`STORY` bổ sung ở GĐ3 cải tiến (nền tảng Backlog Agile — tái dùng hierarchy `parentTask` + `sprintId` sẵn có của Task, xem BR-TASK-19).
 
 ### 1.4 Nguồn công việc (TaskSource) — *cần xác nhận*
 

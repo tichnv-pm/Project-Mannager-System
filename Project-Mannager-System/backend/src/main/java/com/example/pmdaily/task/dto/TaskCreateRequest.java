@@ -66,8 +66,12 @@ public record TaskCreateRequest(
         String notes,
         
         List<UUID> tagIds,
-        
-        UUID sprintId) {
+
+        UUID sprintId,
+
+        @Min(value = 0, message = "Story point không âm")
+        @Max(value = 100, message = "Story point tối đa 100")
+        Integer storyPoints) {
 
     public TaskCreateRequest(
             UUID projectId,
@@ -90,6 +94,6 @@ public record TaskCreateRequest(
             TimeUnit estimateUnit,
             String notes,
             List<UUID> tagIds) {
-        this(projectId, parentTaskId, title, description, assigneeId, collaboratorIds, watcherIds, status, priority, type, source, startDate, dueDate, progress, blocked, blockerReason, estimateMinutes, estimateUnit, notes, tagIds, null);
+        this(projectId, parentTaskId, title, description, assigneeId, collaboratorIds, watcherIds, status, priority, type, source, startDate, dueDate, progress, blocked, blockerReason, estimateMinutes, estimateUnit, notes, tagIds, null, null);
     }
 }

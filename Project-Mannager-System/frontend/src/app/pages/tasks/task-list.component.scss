@@ -333,6 +333,8 @@
     &.type-task { background: rgba(100, 116, 139, 0.2); color: #cbd5e1; }
     &.type-improvement { background: rgba(168, 85, 247, 0.15); color: #e9d5ff; }
     &.type-other { background: rgba(34, 197, 94, 0.15); color: #86efac; }
+    &.type-epic { background: rgba(217, 70, 239, 0.15); color: #f0abfc; }
+    &.type-story { background: rgba(14, 165, 233, 0.15); color: #7dd3fc; }
   }
 
   .progress-mini {

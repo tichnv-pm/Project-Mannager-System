@@ -104,4 +104,7 @@ public class Task extends SoftDeleteEntity {
 
     @Column(name = "sprint_id")
     private UUID sprintId;
+
+    @Column(name = "story_points")
+    private Integer storyPoints;
 }

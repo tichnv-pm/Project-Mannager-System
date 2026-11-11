@@ -29,5 +29,6 @@ public record TaskSummaryResponse(
         Instant createdAt,
         Instant updatedAt,
         UUID sprintId,
+        Integer storyPoints,
         long version) {
 }

@@ -82,3 +82,19 @@ Theo kế hoạch cải tiến, đã thêm pipeline CI và rate limit; nhân ti�
 **Kiểm tra:** `mvn test` toàn bộ backend — 297/297 PASS (295 cũ + 2 test rate-limit mới); `npm test` frontend — 73/73 PASS; `npm run build` frontend — thành công sau khi thêm import còn thiếu.
 
 **Chưa làm trong GĐ 1 (để lại, có lý do):** chuyển test backend sang Testcontainers Postgres — môi trường phiên này không có Docker daemon chạy, không thể verify nếu làm; dọn migration demo-data lẫn trong lịch sử Flyway thật (V7–V10) — rủi ro cao, cần kế hoạch riêng; tăng coverage test component frontend — khối lượng lớn, để giai đoạn sau.
+
+## Giai đoạn 3 (phần 1/7) — Epic/Story/Backlog + Story Point (2026-11-11)
+
+GĐ3 (Agile/Quality nghiệp vụ) gồm 7 hạng mục, triển khai từng phần theo xác nhận với người dùng. Phần 1: nền tảng Epic/Story/Backlog + Story Point — PM xác nhận bắt đầu từ đây trước khi làm Velocity/Burndown (phụ thuộc vào phần này).
+
+**Thiết kế:** tái dùng 100% hạ tầng Task sẵn có thay vì tạo entity mới — Epic/Story là Task với `type=EPIC/STORY`; hierarchy Epic→Story→Task dùng cơ chế `parentTask` đã có (FR-TASK-12); gán sprint dùng `sprintId` đã có trên Task — nhờ vậy Velocity/Burndown ở phần sau chỉ cần đọc dữ liệu có sẵn, không cần migrate lại. Thêm cột `story_points` (song song `estimate_minutes`) và validate mới **BR-TASK-19 (bắt buộc)**: Epic không có task cha; Story nếu có task cha thì cha phải là Epic (`400 INVALID_EPIC_STORY_HIERARCHY`).
+
+**File tạo mới:** `backend/.../db/migration/V20__add_epic_story_backlog.sql`.
+**File cập nhật:**
+- Backend: `TaskType.java` (+EPIC, +STORY), `Task.java` (+storyPoints), `TaskService.java` (`applyParent` validate hierarchy, `create`/`update` set storyPoints), `ErrorCode.java` (+INVALID_EPIC_STORY_HIERARCHY), `TaskCreateRequest/TaskUpdateRequest/TaskResponse/TaskSummaryResponse` (+storyPoints), `TaskIntegrationTest.java` (+5 test).
+- Frontend: `task.model.ts` (+EPIC/STORY, +storyPoints), `task-list.component.ts/html/scss` (dropdown, form field, badge màu), `task-detail.component.ts/html` (label, hiển thị + form sửa storyPoints).
+- Docs: `docs/api/05-task-api.md`, `docs/02-functional-requirements.md` §1.3 (bỏ "cần xác nhận"), `docs/04-business-rules.md` (+BR-TASK-19).
+
+**Kiểm tra:** backend 52/52 PASS trong `TaskIntegrationTest` (47 cũ + 5 mới) + `mvn test` toàn bộ; frontend `npm test` 73/73 PASS + `npm run build` thành công.
+
+**Chưa làm (6/7 hạng mục còn lại của GĐ3, chờ xác nhận tiếp theo):** Velocity (tính từ story_points + sprintId đã có), Burndown/Burnup chart, Definition of Done, Change Request mở rộng Scope–Schedule–Cost, KPI chất lượng (defect density/escape rate), Retrospective gắn sprintId. Chưa xây màn hình Backlog riêng (kéo-thả, nhóm theo Epic) — hiện tái dùng màn hình Task list có sẵn với filter `type=EPIC/STORY`.

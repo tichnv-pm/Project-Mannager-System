@@ -8,5 +8,7 @@ public enum TaskType {
     BUG,
     IMPROVEMENT,
     TASK,
-    OTHER
+    OTHER,
+    EPIC,
+    STORY
 }

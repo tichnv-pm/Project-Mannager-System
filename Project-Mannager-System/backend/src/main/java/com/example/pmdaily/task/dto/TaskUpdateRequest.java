@@ -67,6 +67,10 @@ public record TaskUpdateRequest(
 
         UUID sprintId,
 
+        @Min(value = 0, message = "Story point không âm")
+        @Max(value = 100, message = "Story point tối đa 100")
+        Integer storyPoints,
+
         @NotNull(message = "Phiên bản không hợp lệ")
         Long version) {
 }

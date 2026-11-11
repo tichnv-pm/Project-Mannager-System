@@ -310,6 +310,8 @@
           <div class="form-group">
             <label>Loại</label>
             <select formControlName="type" class="form-control" id="form-task-type">
+              <option value="EPIC">🧩 Epic</option>
+              <option value="STORY">📖 Story</option>
               <option value="TASK">📋 Công việc</option>
               <option value="FEATURE">✨ Tính năng</option>
               <option value="BUG">🐛 Lỗi</option>
@@ -364,6 +366,10 @@
           <div class="form-group">
             <label>Ước tính (phút)</label>
             <input type="number" formControlName="estimateMinutes" min="0" class="form-control" id="form-task-estimate" placeholder="VD: 480" />
+          </div>
+          <div class="form-group">
+            <label>Story point</label>
+            <input type="number" formControlName="storyPoints" min="0" max="100" class="form-control" id="form-task-story-points" placeholder="VD: 5" />
           </div>
         </div>
 

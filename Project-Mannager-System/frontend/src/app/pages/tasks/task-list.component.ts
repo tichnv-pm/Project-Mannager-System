@@ -88,7 +88,7 @@ export class TaskListComponent implements OnInit, OnDestroy {
 
   readonly statusOptions: TaskStatus[] = ['TODO', 'IN_PROGRESS', 'REVIEW', 'BLOCKED', 'DONE', 'CANCELLED'];
   readonly priorityOptions: TaskPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
-  readonly typeOptions: TaskType[] = ['TASK', 'FEATURE', 'BUG', 'IMPROVEMENT', 'OTHER'];
+  readonly typeOptions: TaskType[] = ['TASK', 'FEATURE', 'BUG', 'IMPROVEMENT', 'OTHER', 'EPIC', 'STORY'];
 
   // ─── Modal: Create/Edit ────────────────────────────────────────────
   showModal = signal(false);
@@ -130,6 +130,7 @@ export class TaskListComponent implements OnInit, OnDestroy {
       description: [''],
       notes:       [''],
       estimateMinutes: [null],
+      storyPoints: [null, [Validators.min(0), Validators.max(100)]],
       progress:    [0, [Validators.min(0), Validators.max(100)]],
     });
 
@@ -409,7 +410,7 @@ export class TaskListComponent implements OnInit, OnDestroy {
         projectId:   initialProjectId,
         title: '', type: 'TASK', priority: 'MEDIUM',
         assigneeId: '', startDate: '', dueDate: '',
-        description: '', notes: '', estimateMinutes: null, progress: 0,
+        description: '', notes: '', estimateMinutes: null, storyPoints: null, progress: 0,
       });
       this.showModal.set(true);
     });
@@ -437,6 +438,7 @@ export class TaskListComponent implements OnInit, OnDestroy {
             description: detail.description || '',
             notes:       detail.notes || '',
             estimateMinutes: detail.estimateMinutes ?? null,
+            storyPoints: detail.storyPoints ?? null,
             progress:    detail.progress,
           }, { emitEvent: false });
           this.showModal.set(true);
@@ -465,6 +467,7 @@ export class TaskListComponent implements OnInit, OnDestroy {
         assigneeId: v.assigneeId || null, startDate: v.startDate || null,
         dueDate: v.dueDate || null, description: v.description || null,
         notes: v.notes || null, estimateMinutes: v.estimateMinutes || null,
+        storyPoints: v.storyPoints ?? null,
         progress: v.progress ?? 0, version: this.editingVersion,
         status: this.editingStatus,
         blocked: this.editingBlocked,
@@ -480,6 +483,7 @@ export class TaskListComponent implements OnInit, OnDestroy {
         assigneeId: v.assigneeId || undefined, startDate: v.startDate || undefined,
         dueDate: v.dueDate || undefined, description: v.description || undefined,
         notes: v.notes || undefined, estimateMinutes: v.estimateMinutes || undefined,
+        storyPoints: v.storyPoints ?? undefined,
         progress: v.progress ?? 0,
       }).subscribe({
         next: () => { this.formSubmitting.set(false); this.closeModal(); this.loadTasks(); },

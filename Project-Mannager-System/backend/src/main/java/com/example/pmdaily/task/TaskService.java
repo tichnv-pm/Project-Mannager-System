@@ -153,6 +153,7 @@ public class TaskService {
         task.setEstimateMinutes(request.estimateMinutes());
         task.setEstimateUnit(request.estimateUnit() != null ? request.estimateUnit() : TimeUnit.MINUTE);
         task.setNotes(request.notes());
+        task.setStoryPoints(request.storyPoints());
 
         applyParent(task, request.parentTaskId(), actor);
         validateDates(task);
@@ -298,6 +299,7 @@ public class TaskService {
             task.setDueDate(request.dueDate());
             task.setEstimateMinutes(request.estimateMinutes());
             task.setEstimateUnit(request.estimateUnit() != null ? request.estimateUnit() : task.getEstimateUnit());
+            task.setStoryPoints(request.storyPoints());
             applyParent(task, request.parentTaskId(), actor);
             validateDates(task);
             task.setAssignee(request.assigneeId() != null
@@ -738,9 +740,15 @@ public class TaskService {
             task.setParentTask(null);
             return;
         }
+        if (task.getType() == TaskType.EPIC) {
+            throw new BusinessException(ErrorCode.INVALID_EPIC_STORY_HIERARCHY);
+        }
         Task parent = findActive(parentTaskId);
         if (!parent.getProject().getId().equals(task.getProject().getId())) {
             throw new BusinessException(ErrorCode.PARENT_TASK_PROJECT_MISMATCH);
+        }
+        if (task.getType() == TaskType.STORY && parent.getType() != TaskType.EPIC) {
+            throw new BusinessException(ErrorCode.INVALID_EPIC_STORY_HIERARCHY);
         }
         Task cursor = parent;
         while (cursor != null) {
@@ -856,7 +864,7 @@ public class TaskService {
                 tags, collaborators, watchers,
                 commentRepository.countByTaskIdAndDeletedAtIsNull(task.getId()),
                 attachmentRepository.countByTaskIdAndDeletedAtIsNull(task.getId()),
-                response.createdAt(), response.updatedAt(), response.sprintId(), response.version());
+                response.createdAt(), response.updatedAt(), response.sprintId(), response.storyPoints(), response.version());
     }
 
     private TaskHistoryEntry toHistoryEntry(AuditLog logEntry) {

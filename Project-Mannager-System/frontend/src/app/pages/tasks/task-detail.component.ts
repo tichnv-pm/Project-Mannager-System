@@ -116,6 +116,7 @@ export class TaskDetailComponent implements OnInit {
       description:    [''],
       notes:          [''],
       estimateMinutes: [null],
+      storyPoints: [null, [Validators.min(0), Validators.max(100)]],
     });
   }
 
@@ -369,6 +370,7 @@ export class TaskDetailComponent implements OnInit {
       startDate: t.startDate || '', dueDate: t.dueDate || '',
       description: t.description || '', notes: t.notes || '',
       estimateMinutes: t.estimateMinutes ?? null,
+      storyPoints: t.storyPoints ?? null,
     });
     this.showEditModal.set(true);
   }
@@ -390,6 +392,7 @@ export class TaskDetailComponent implements OnInit {
       startDate: v.startDate || null, dueDate: v.dueDate || null,
       description: v.description || null, notes: v.notes || null,
       estimateMinutes: v.estimateMinutes || null,
+      storyPoints: v.storyPoints ?? null,
       progress: t.progress, version: t.version,
       status: t.status,
       blocked: t.blocked,
@@ -571,7 +574,8 @@ export class TaskDetailComponent implements OnInit {
   getTypeLabel(type: string): string {
     const m: Record<string, string> = {
       'TASK': '📋 Công việc', 'FEATURE': '✨ Tính năng',
-      'BUG': '🐛 Lỗi', 'IMPROVEMENT': '⬆️ Cải tiến', 'OTHER': '📦 Khác'
+      'BUG': '🐛 Lỗi', 'IMPROVEMENT': '⬆️ Cải tiến', 'OTHER': '📦 Khác',
+      'EPIC': '🧩 Epic', 'STORY': '📖 Story'
     };
     return m[type] || type;
   }

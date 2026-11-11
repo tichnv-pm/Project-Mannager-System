@@ -47,5 +47,6 @@ public record TaskResponse(
         Instant createdAt,
         Instant updatedAt,
         UUID sprintId,
+        Integer storyPoints,
         long version) {
 }

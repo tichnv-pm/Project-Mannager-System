@@ -99,14 +99,17 @@ TODO ──→ IN_PROGRESS ──→ REVIEW ──→ DONE
 | `watcherIds` | uuid[] | — | Thuộc project |
 | `status` | string | — | Mặc định `TODO` |
 | `priority` | string | — | Mặc định `MEDIUM` |
-| `type` | string | — | `FEATURE, BUG, IMPROVEMENT, TASK, OTHER`, mặc định `TASK` |
+| `type` | string | — | `EPIC, STORY, FEATURE, BUG, IMPROVEMENT, TASK, OTHER`, mặc định `TASK` |
 | `source` | string | — | `MANUAL, MEETING, ACTION_ITEM, ISSUE, OTHER`, mặc định `MANUAL` |
 | `startDate` / `dueDate` | date | — | dueDate ≥ startDate (BR-TASK-02) |
 | `progress` | int | — | 0–100 (BR-TASK-03) |
 | `blocked` + `blockerReason` | boolean/string | — | blocked=true ⇒ bắt buộc reason (BR-TASK-10) |
 | `estimateMinutes` | int | — | ≥ 0 |
+| `storyPoints` | int | — | 0–100; Agile, dùng cho Epic/Story (BR-TASK-19) |
 | `notes` | string | — | — |
 | `tagIds` | uuid[] | — | — |
+
+**BR-TASK-19 (Epic/Story hierarchy):** Epic (`type=EPIC`) không được có `parentTaskId`. Story (`type=STORY`) nếu có `parentTaskId` thì task cha đó phải là Epic. Vi phạm → `400 INVALID_EPIC_STORY_HIERARCHY`.
 
 - **Response `201`** — `TaskResponse`:
 

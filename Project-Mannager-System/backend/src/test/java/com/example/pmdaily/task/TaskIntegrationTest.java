@@ -36,6 +36,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.hamcrest.Matchers.everyItem;
+import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -319,6 +321,92 @@ class TaskIntegrationTest {
                                 """.formatted(projectId)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_DATE_RANGE"));
+    }
+
+    @Test
+    void create_epic_withStoryPoints_success() throws Exception {
+        mockMvc.perform(post("/api/v1/tasks")
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"projectId":"%s","title":"Epic thanh toán","type":"EPIC","storyPoints":21}
+                                """.formatted(projectId)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.type").value("EPIC"))
+                .andExpect(jsonPath("$.storyPoints").value(21))
+                .andExpect(jsonPath("$.parentTaskId").doesNotExist());
+    }
+
+    @Test
+    void create_epicWithParent_returns400() throws Exception {
+        String parentTaskId = createTask();
+
+        mockMvc.perform(post("/api/v1/tasks")
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"projectId":"%s","title":"Epic sai","type":"EPIC","parentTaskId":"%s"}
+                                """.formatted(projectId, parentTaskId)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_EPIC_STORY_HIERARCHY"));
+    }
+
+    @Test
+    void create_storyUnderEpic_success() throws Exception {
+        MvcResult epicResult = mockMvc.perform(post("/api/v1/tasks")
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"projectId":"%s","title":"Epic cha","type":"EPIC"}
+                                """.formatted(projectId)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String epicId = objectMapper.readTree(epicResult.getResponse().getContentAsString()).get("id").asText();
+
+        mockMvc.perform(post("/api/v1/tasks")
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"projectId":"%s","title":"Story con","type":"STORY",
+                                 "parentTaskId":"%s","storyPoints":5}
+                                """.formatted(projectId, epicId)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.type").value("STORY"))
+                .andExpect(jsonPath("$.parentTaskId").value(epicId))
+                .andExpect(jsonPath("$.storyPoints").value(5));
+    }
+
+    @Test
+    void create_storyUnderNonEpicParent_returns400() throws Exception {
+        String parentTaskId = createTask();
+
+        mockMvc.perform(post("/api/v1/tasks")
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"projectId":"%s","title":"Story sai cha","type":"STORY","parentTaskId":"%s"}
+                                """.formatted(projectId, parentTaskId)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_EPIC_STORY_HIERARCHY"));
+    }
+
+    @Test
+    void list_filterByEpicType_returnsOnlyEpics() throws Exception {
+        mockMvc.perform(post("/api/v1/tasks")
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"projectId":"%s","title":"Epic lọc","type":"EPIC"}
+                                """.formatted(projectId)))
+                .andExpect(status().isCreated());
+        createTask();
+
+        mockMvc.perform(get("/api/v1/tasks")
+                        .header("Authorization", bearer(pm()))
+                        .param("projectId", projectId)
+                        .param("type", "EPIC"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].type", everyItem(is("EPIC"))));
     }
 
     @Test

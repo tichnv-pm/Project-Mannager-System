@@ -2,7 +2,7 @@ export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'REVIEW' | 'DONE' | 'BLOCKED' 
 
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
-export type TaskType = 'FEATURE' | 'BUG' | 'TASK' | 'IMPROVEMENT' | 'OTHER';
+export type TaskType = 'FEATURE' | 'BUG' | 'TASK' | 'IMPROVEMENT' | 'OTHER' | 'EPIC' | 'STORY';
 
 export type TaskSource = 'MANUAL' | 'MEETING' | 'ACTION_ITEM' | 'ISSUE' | 'OTHER';
 
@@ -42,6 +42,7 @@ export interface TaskSummaryResponse {
   createdAt: string;
   updatedAt: string;
   sprintId?: string;
+  storyPoints?: number;
   assignee?: UserBriefRef;
   version: number;
 }
@@ -82,6 +83,7 @@ export interface TaskCreateRequest {
   blockerReason?: string;
   estimateMinutes?: number;
   notes?: string;
+  storyPoints?: number;
 }
 
 export interface TaskUpdateRequest {
@@ -102,6 +104,7 @@ export interface TaskUpdateRequest {
   blockerReason?: string;
   estimateMinutes?: number;
   sprintId?: string;
+  storyPoints?: number;
   version: number;
 }
 
