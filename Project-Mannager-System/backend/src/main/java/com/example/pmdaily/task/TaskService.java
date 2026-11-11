@@ -279,41 +279,46 @@ public class TaskService {
     public TaskResponse update(UserPrincipal actor, UUID taskId, TaskUpdateRequest request) {
         Task task = findActive(taskId);
         Project project = task.getProject();
-        ensureCanView(project, actor);
+        ensureCanUpdateOrAssignee(task, actor);
 
         if (task.getVersion() != request.version()) {
             throw new ConflictException();
         }
 
-        task.setTitle(request.title());
-        task.setDescription(request.description());
-        task.setPriority(request.priority() != null ? request.priority() : task.getPriority());
-        task.setType(request.type() != null ? request.type() : task.getType());
-        task.setSource(request.source() != null ? request.source() : task.getSource());
-        task.setStartDate(request.startDate());
-        task.setDueDate(request.dueDate());
-        task.setEstimateMinutes(request.estimateMinutes());
-        task.setEstimateUnit(request.estimateUnit() != null ? request.estimateUnit() : task.getEstimateUnit());
-        applyParent(task, request.parentTaskId(), actor);
-        validateDates(task);
-        task.setAssignee(request.assigneeId() != null
-                ? findProjectMemberUser(project, request.assigneeId())
-                : null);
+        // BR-TASK-13: MEMBER chỉ sửa được task được giao cho mình, và chỉ status/progress/notes;
+        // admin/PM dự án mới được sửa toàn bộ field.
+        boolean fullEdit = isAdminOrPm(actor) || isProjectManager(project, actor.getId());
+        if (fullEdit) {
+            task.setTitle(request.title());
+            task.setDescription(request.description());
+            task.setPriority(request.priority() != null ? request.priority() : task.getPriority());
+            task.setType(request.type() != null ? request.type() : task.getType());
+            task.setSource(request.source() != null ? request.source() : task.getSource());
+            task.setStartDate(request.startDate());
+            task.setDueDate(request.dueDate());
+            task.setEstimateMinutes(request.estimateMinutes());
+            task.setEstimateUnit(request.estimateUnit() != null ? request.estimateUnit() : task.getEstimateUnit());
+            applyParent(task, request.parentTaskId(), actor);
+            validateDates(task);
+            task.setAssignee(request.assigneeId() != null
+                    ? findProjectMemberUser(project, request.assigneeId())
+                    : null);
 
-        if (request.collaboratorIds() != null) {
-            replaceCollaboratorsInternal(task, request.collaboratorIds(), actor);
-        }
-        if (request.watcherIds() != null) {
-            replaceWatchersInternal(task, request.watcherIds(), actor);
-        }
-        if (request.tagIds() != null) {
-            replaceTagsInternal(task, request.tagIds(), actor);
-        }
-        if (request.sprintId() != null) {
-            sprintRepository.findByIdAndDeletedAtIsNull(request.sprintId())
-                    .filter(s -> s.getProjectId().equals(project.getId()))
-                    .orElseThrow(() -> new BusinessException(ErrorCode.BAD_REQUEST, "Sprint không hợp lệ cho dự án này"));
-            task.setSprintId(request.sprintId());
+            if (request.collaboratorIds() != null) {
+                replaceCollaboratorsInternal(task, request.collaboratorIds(), actor);
+            }
+            if (request.watcherIds() != null) {
+                replaceWatchersInternal(task, request.watcherIds(), actor);
+            }
+            if (request.tagIds() != null) {
+                replaceTagsInternal(task, request.tagIds(), actor);
+            }
+            if (request.sprintId() != null) {
+                sprintRepository.findByIdAndDeletedAtIsNull(request.sprintId())
+                        .filter(s -> s.getProjectId().equals(project.getId()))
+                        .orElseThrow(() -> new BusinessException(ErrorCode.BAD_REQUEST, "Sprint không hợp lệ cho dự án này"));
+                task.setSprintId(request.sprintId());
+            }
         }
 
         TaskStatus newStatus = request.status() != null ? request.status() : task.getStatus();
@@ -759,12 +764,12 @@ public class TaskService {
         }
         task.setStatus(status);
         if (wantBlocked) {
-            task.setBlocked(true);
             if (blockerReason != null && !blockerReason.isBlank()) {
                 task.setBlockerReason(blockerReason);
             } else if (task.getBlockerReason() == null || task.getBlockerReason().isBlank()) {
-                task.setBlockerReason("Tắc nghẽn");
+                throw new BusinessException(ErrorCode.BLOCKER_REASON_REQUIRED);
             }
+            task.setBlocked(true);
         } else {
             task.setBlocked(false);
             task.setBlockerReason(null);

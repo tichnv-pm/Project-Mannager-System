@@ -7,6 +7,7 @@ import { StatusChipComponent } from '../../shared/components/status-chip.compone
 import { PriorityChipComponent } from '../../shared/components/priority-chip.component';
 import { HasPermissionDirective } from '../../shared/directives/has-permission.directive';
 import { ProjectService } from '../projects/project.service';
+import { ProjectMemberResponse } from '../projects/project.model';
 import { TaskService } from './task.service';
 import { GitService } from './git.service';
 import { GitCommitResponse, GitPullRequestResponse } from './git.model';
