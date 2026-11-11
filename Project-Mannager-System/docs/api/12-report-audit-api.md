@@ -17,6 +17,7 @@ Báo cáo tổng hợp (aggregate tại DB, tránh N+1) cho ADMIN/PM + xuất fi
 | GET | `/api/v1/reports/overdue-tasks` | `report:view` | Danh sách task quá hạn | FR-REP-03 |
 | GET | `/api/v1/reports/project-progress` | `report:view` | Tiến độ dự án | FR-REP-04 |
 | GET | `/api/v1/reports/risk-issue-summary` | `report:view` | Tổng hợp risk & issue | FR-REP-05 |
+| GET | `/api/v1/reports/quality-kpi` | `report:view` | KPI chất lượng (defect density, escape rate) | GĐ3 cải tiến |
 | GET | `/api/v1/reports/export` | `report:export` | Xuất CSV/Excel báo cáo | FR-REP-06 |
 | GET | `/api/v1/audit-logs` | `audit:view` | Nhật ký hoạt động | FR-AUD-01 |
 
@@ -76,7 +77,23 @@ Báo cáo tổng hợp (aggregate tại DB, tránh N+1) cho ADMIN/PM + xuất fi
 }
 ```
 
-### 3.6 GET `/api/v1/reports/export`
+### 3.6 GET `/api/v1/reports/quality-kpi` (GĐ3 cải tiến)
+
+- **Query params**: `projectId` (bắt buộc).
+- **Response `200`**:
+
+```json
+{
+  "totalIssues": 3, "issuesFoundInQa": 2, "issuesEscaped": 1, "escapeRatePercent": 33.33,
+  "completedTasks": 1, "defectDensityPerTask": 3.0,
+  "issuesBySeverity": [ { "severity": "CRITICAL", "count": 1 } ]
+}
+```
+
+- **Escape rate**: % Issue có `testCaseId = NULL` (không gắn với 1 test case QA — tức không bị phát hiện qua QA testing trước đó, coi như "lọt" ra ngoài) trên tổng số Issue của dự án.
+- **Defect density**: tổng số Issue / số task đã `DONE` của dự án (0 nếu chưa có task DONE nào).
+
+### 3.7 GET `/api/v1/reports/export`
 
 - **Phân quyền**: `report:export`. Audit: có (export).
 - **Query params**: `report` (bắt buộc: `tasks-by-status | tasks-by-assignee | overdue-tasks | project-progress | risk-issue-summary`), `format` (`xlsx` mặc định, `csv`), các filter của báo cáo tương ứng.
@@ -84,7 +101,7 @@ Báo cáo tổng hợp (aggregate tại DB, tránh N+1) cho ADMIN/PM + xuất fi
 - **Streaming (v1.1)**: endpoint trả trực tiếp qua `HttpServletResponse.getOutputStream()` — service ghi CSV vào `OutputStream` bằng `PrintWriter` UTF-8 autoflush, không giữ toàn bộ trong RAM (thay `byte[]` cũ).
 - **Lỗi**: `400 EXPORT_LIMIT_EXCEEDED` (quá 10.000 dòng — FR-REP-06); `400 VALIDATION_ERROR` (report không hợp lệ).
 
-### 3.7 GET `/api/v1/audit-logs`
+### 3.8 GET `/api/v1/audit-logs`
 
 - **Phân quyền**: `audit:view` (chỉ ADMIN). Audit: không (bản thân là log).
 - **Query params**:

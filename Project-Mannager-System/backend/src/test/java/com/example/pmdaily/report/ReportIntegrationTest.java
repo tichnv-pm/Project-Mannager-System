@@ -33,6 +33,7 @@ import com.example.pmdaily.user.UserStatus;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import static org.hamcrest.Matchers.closeTo;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.containsString;
@@ -70,6 +71,8 @@ class ReportIntegrationTest {
     private ProjectRepository projectRepository;
     @Autowired
     private TaskRepository taskRepository;
+    @Autowired
+    private com.example.pmdaily.issue.IssueRepository issueRepository;
 
     private User pmUser;
     private Project project;
@@ -80,6 +83,7 @@ class ReportIntegrationTest {
             try (java.sql.Statement statement = con.createStatement()) {
                 statement.execute("SET REFERENTIAL_INTEGRITY FALSE");
                 statement.executeUpdate("DELETE FROM tasks");
+                statement.executeUpdate("DELETE FROM issues");
                 statement.executeUpdate("DELETE FROM project_members");
                 statement.executeUpdate("DELETE FROM projects");
                 statement.executeUpdate("DELETE FROM user_roles");
@@ -165,6 +169,47 @@ class ReportIntegrationTest {
                 .andExpect(header().string("Content-Disposition", "attachment; filename=\"report-tasks-by-status.csv\""))
                 .andExpect(content().string(containsString("Report: tasks-by-status")))
                 .andExpect(content().string(containsString("Status,Count")));
+    }
+
+    @Test
+    void qualityKpi_computesEscapeRateAndDensity() throws Exception {
+        String token = login("pm.rpt", PASSWORD);
+
+        com.example.pmdaily.issue.Issue foundInQa1 = newIssue("Lỗi tìm thấy khi test 1",
+                com.example.pmdaily.issue.IssueSeverity.HIGH, UUID.randomUUID());
+        issueRepository.save(foundInQa1);
+        com.example.pmdaily.issue.Issue foundInQa2 = newIssue("Lỗi tìm thấy khi test 2",
+                com.example.pmdaily.issue.IssueSeverity.MEDIUM, UUID.randomUUID());
+        issueRepository.save(foundInQa2);
+        com.example.pmdaily.issue.Issue escaped = newIssue("Lỗi báo từ production",
+                com.example.pmdaily.issue.IssueSeverity.CRITICAL, null);
+        issueRepository.save(escaped);
+
+        mockMvc.perform(get("/api/v1/reports/quality-kpi")
+                        .header("Authorization", "Bearer " + token)
+                        .param("projectId", project.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalIssues").value(3))
+                .andExpect(jsonPath("$.issuesFoundInQa").value(2))
+                .andExpect(jsonPath("$.issuesEscaped").value(1))
+                .andExpect(jsonPath("$.escapeRatePercent").value(closeTo(33.33, 0.1)))
+                .andExpect(jsonPath("$.completedTasks").value(1))
+                .andExpect(jsonPath("$.defectDensityPerTask").value(3.0))
+                .andExpect(jsonPath("$.issuesBySeverity", hasSize(3)));
+    }
+
+    private com.example.pmdaily.issue.Issue newIssue(String title,
+            com.example.pmdaily.issue.IssueSeverity severity, UUID testCaseId) {
+        com.example.pmdaily.issue.Issue issue = new com.example.pmdaily.issue.Issue();
+        issue.setCode("ISS-" + UUID.randomUUID().toString().substring(0, 8));
+        issue.setProject(project);
+        issue.setTitle(title);
+        issue.setSeverity(severity);
+        issue.setOwner(pmUser);
+        issue.setTestCaseId(testCaseId);
+        issue.setCreatedBy(pmUser.getId());
+        issue.setUpdatedBy(pmUser.getId());
+        return issue;
     }
 
     private Role createRole(String code, String name, String[] perms) {

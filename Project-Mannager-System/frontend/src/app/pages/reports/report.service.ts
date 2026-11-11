@@ -53,6 +53,16 @@ export interface RiskIssueSummaryReport {
   issuesBySeverity: IssueSeverityCount[];
 }
 
+export interface QualityKpiReport {
+  totalIssues: number;
+  issuesFoundInQa: number;
+  issuesEscaped: number;
+  escapeRatePercent: number;
+  completedTasks: number;
+  defectDensityPerTask: number;
+  issuesBySeverity: IssueSeverityCount[];
+}
+
 export interface ReportParams {
   projectId?: string;
   projectIds?: string[];
@@ -96,6 +106,11 @@ export class ReportService {
   getRiskIssueSummary(p: ReportParams = {}): Observable<RiskIssueSummaryReport> {
     let params = this.buildParams(p);
     return this.http.get<RiskIssueSummaryReport>(`${this.API}/risk-issue-summary`, { params });
+  }
+
+  getQualityKpi(p: ReportParams = {}): Observable<QualityKpiReport> {
+    let params = this.buildParams(p);
+    return this.http.get<QualityKpiReport>(`${this.API}/quality-kpi`, { params });
   }
 
   exportReport(report: ReportType, format: 'csv' | 'xlsx', p: ReportParams = {}): Observable<Blob> {

@@ -6,7 +6,9 @@ import { PageHeaderComponent } from '../../shared/components/page-header.compone
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { ProjectService } from '../projects/project.service';
 import { ProjectOption } from '../dashboard/dashboard.model';
-import { ReportService, ReportType } from './report.service';
+import { QualityKpiReport, ReportService, ReportType } from './report.service';
+
+type ReportTabKey = 'tasks-by-status' | 'tasks-by-assignee' | 'overdue-tasks' | 'project-progress' | 'risk-issue-summary' | 'quality-kpi';
 
 @Component({
   selector: 'app-report-list',
@@ -22,14 +24,15 @@ export class ReportListComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
 
   // ─── State ────────────────────────────────────────────────────
-  activeTab = signal<'tasks-by-status' | 'tasks-by-assignee' | 'overdue-tasks' | 'project-progress' | 'risk-issue-summary'>('tasks-by-status');
+  activeTab = signal<ReportTabKey>('tasks-by-status');
 
-  readonly reportTabs: { key: 'tasks-by-status' | 'tasks-by-assignee' | 'overdue-tasks' | 'project-progress' | 'risk-issue-summary'; label: string }[] = [
+  readonly reportTabs: { key: ReportTabKey; label: string }[] = [
     { key: 'tasks-by-status', label: '📊 Theo trạng thái' },
     { key: 'tasks-by-assignee', label: '👤 Theo người làm' },
     { key: 'overdue-tasks', label: '⏰ Trễ hạn' },
     { key: 'project-progress', label: '📈 Tiến độ dự án' },
-    { key: 'risk-issue-summary', label: '⚠️ Risk & Issue' }
+    { key: 'risk-issue-summary', label: '⚠️ Risk & Issue' },
+    { key: 'quality-kpi', label: '🎯 KPI chất lượng' }
   ];
   loading = signal(false);
   error = signal<string | null>(null);
@@ -49,6 +52,7 @@ export class ReportListComponent implements OnInit, OnDestroy {
   overdueSize = 50;
   progressReport = signal<{ projectId: string; code: string; name: string; progress: number; totalTasks: number; doneTasks: number }[]>([]);
   riskIssueReport = signal<{ openRisks: number; openIssues: number; risksByLevel: { level: string; count: number }[]; issuesBySeverity: { severity: string; count: number }[] } | null>(null);
+  qualityKpiReport = signal<QualityKpiReport | null>(null);
 
   exporting = signal(false);
 
@@ -76,7 +80,7 @@ export class ReportListComponent implements OnInit, OnDestroy {
     return new Date().toISOString().slice(0, 10);
   }
 
-  switchTab(tab: 'tasks-by-status' | 'tasks-by-assignee' | 'overdue-tasks' | 'project-progress' | 'risk-issue-summary'): void {
+  switchTab(tab: ReportTabKey): void {
     this.activeTab.set(tab);
     this.overduePage = 0;
     this.error.set(null);
@@ -150,6 +154,17 @@ export class ReportListComponent implements OnInit, OnDestroy {
         }
         this.reportService.getRiskIssueSummary(params).pipe(takeUntil(this.destroy$)).subscribe({
           next: res => { this.riskIssueReport.set(res); this.loading.set(false); },
+          error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'Không thể tải báo cáo'); }
+        });
+        break;
+      case 'quality-kpi':
+        if (!this.selectedProjectId) {
+          this.error.set('Vui lòng chọn dự án để xem KPI chất lượng');
+          this.loading.set(false);
+          break;
+        }
+        this.reportService.getQualityKpi(params).pipe(takeUntil(this.destroy$)).subscribe({
+          next: res => { this.qualityKpiReport.set(res); this.loading.set(false); },
           error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'Không thể tải báo cáo'); }
         });
         break;

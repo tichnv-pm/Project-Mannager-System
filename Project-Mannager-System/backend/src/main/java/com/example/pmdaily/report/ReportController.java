@@ -20,6 +20,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import com.example.pmdaily.common.PageResponse;
 import com.example.pmdaily.report.dto.ProjectProgressReportResponse;
+import com.example.pmdaily.report.dto.QualityKpiReportResponse;
 import com.example.pmdaily.report.dto.RiskIssueSummaryReportResponse;
 import com.example.pmdaily.report.dto.TasksByAssigneeReportResponse;
 import com.example.pmdaily.report.dto.TasksByStatusReportResponse;
@@ -83,6 +84,14 @@ public class ReportController {
             @AuthenticationPrincipal UserPrincipal actor,
             @RequestParam UUID projectId) {
         return reportService.getRiskIssueSummary(actor, projectId);
+    }
+
+    @GetMapping("/quality-kpi")
+    @PreAuthorize("hasAuthority('report:view')")
+    public QualityKpiReportResponse qualityKpi(
+            @AuthenticationPrincipal UserPrincipal actor,
+            @RequestParam UUID projectId) {
+        return reportService.getQualityKpi(actor, projectId);
     }
 
     @GetMapping("/export")

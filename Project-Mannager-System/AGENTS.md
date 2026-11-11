@@ -118,3 +118,16 @@ GĐ3 (Agile/Quality nghiệp vụ) gồm 7 hạng mục, triển khai từng ph�
 **Kiểm tra:** `ProjectDodItemIntegrationTest` 6/6 PASS; `TaskIntegrationTest` 54/54 PASS (52 cũ + 2 mới); `mvn test` toàn bộ backend; frontend `npm test` 73/73 + `npm run build` thành công, không cảnh báo budget.
 
 **Chưa làm:** màn hình quản lý DoD cho PM (tạo/sửa/xóa tiêu chí) — hiện chỉ có API, chưa có UI riêng; PM cần dùng API trực tiếp (Swagger) cho tới khi làm màn hình cấu hình dự án.
+
+## Giai đoạn 3 (phần 4/7) — KPI chất lượng (2026-11-11)
+
+**Thiết kế:** báo cáo thuần đọc dữ liệu có sẵn, không migration/entity mới — tái dùng `report` module (style SQL trực tiếp qua `jdbcTemplate`, giống `getRiskIssueSummary` đã có).
+
+- **Escape rate**: % Issue có `test_case_id IS NULL` trên tổng Issue của dự án. Cơ sở: module QA (V15) đã tự động tạo Issue loại BUG kèm `test_case_id` khi 1 test step QA fail (đã có từ trước) — nên `test_case_id IS NOT NULL` nghĩa là Issue được phát hiện qua QA testing; `NULL` nghĩa là báo trực tiếp (không qua QA, coi như "lọt" ra ngoài/escaped).
+- **Defect density**: tổng số Issue / số task `DONE` của dự án (0 nếu chưa có task DONE).
+
+**File tạo mới:** `backend/src/main/java/com/example/pmdaily/report/dto/QualityKpiReportResponse.java`.
+**File cập nhật:** `ReportService.java` (+getQualityKpi), `ReportController.java` (+endpoint `GET /reports/quality-kpi`), `ReportIntegrationTest.java` (+1 test), frontend `report.service.ts` (+model, +API), `report-list.component.ts/html` (+tab "🎯 KPI chất lượng").
+**Kiểm tra:** `ReportIntegrationTest` 2/2 PASS; `mvn test` toàn bộ backend; frontend `npm test` 73/73 + `npm run build` thành công.
+
+**Chưa làm (3/7 hạng mục còn lại của GĐ3):** Change Request mở rộng Scope–Schedule–Cost, Retrospective gắn Sprint, màn hình Backlog riêng (tùy chọn).

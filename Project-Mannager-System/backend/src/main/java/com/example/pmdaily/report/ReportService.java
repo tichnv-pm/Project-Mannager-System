@@ -27,6 +27,7 @@ import org.springframework.security.access.AccessDeniedException;
 import com.example.pmdaily.exception.BusinessException;
 import com.example.pmdaily.project.ProjectMemberRepository;
 import com.example.pmdaily.report.dto.ProjectProgressReportResponse;
+import com.example.pmdaily.report.dto.QualityKpiReportResponse;
 import com.example.pmdaily.report.dto.RiskIssueSummaryReportResponse;
 import com.example.pmdaily.report.dto.TasksByAssigneeReportResponse;
 import com.example.pmdaily.report.dto.TasksByStatusReportResponse;
@@ -188,6 +189,33 @@ public class ReportService {
         );
 
         return new RiskIssueSummaryReportResponse(openRisks, openIssues, risksByLevel, issuesBySeverity);
+    }
+
+    public QualityKpiReportResponse getQualityKpi(UserPrincipal actor, UUID projectId) {
+        checkProjectAccess(actor, projectId);
+
+        String totalIssuesSql = "SELECT COUNT(*) FROM issues WHERE deleted_at IS NULL AND project_id = ?";
+        long totalIssues = toLong(jdbcTemplate.queryForObject(totalIssuesSql, Long.class, projectId));
+
+        String foundInQaSql =
+                "SELECT COUNT(*) FROM issues WHERE deleted_at IS NULL AND project_id = ? AND test_case_id IS NOT NULL";
+        long issuesFoundInQa = toLong(jdbcTemplate.queryForObject(foundInQaSql, Long.class, projectId));
+        long issuesEscaped = totalIssues - issuesFoundInQa;
+        double escapeRatePercent = totalIssues == 0 ? 0.0 : (issuesEscaped * 100.0 / totalIssues);
+
+        String completedTasksSql =
+                "SELECT COUNT(*) FROM tasks WHERE deleted_at IS NULL AND project_id = ? AND status = 'DONE'";
+        long completedTasks = toLong(jdbcTemplate.queryForObject(completedTasksSql, Long.class, projectId));
+        double defectDensityPerTask = completedTasks == 0 ? 0.0 : (totalIssues * 1.0 / completedTasks);
+
+        String issueSeveritySql = "SELECT severity, COUNT(*) AS cnt FROM issues WHERE deleted_at IS NULL AND project_id = ? GROUP BY severity";
+        var issuesBySeverity = jdbcTemplate.query(issueSeveritySql, (rs, rowNum) ->
+                new QualityKpiReportResponse.IssueSeverityCount(rs.getString("severity"), rs.getLong("cnt")),
+                projectId
+        );
+
+        return new QualityKpiReportResponse(totalIssues, issuesFoundInQa, issuesEscaped, escapeRatePercent,
+                completedTasks, defectDensityPerTask, issuesBySeverity);
     }
 
     @Transactional

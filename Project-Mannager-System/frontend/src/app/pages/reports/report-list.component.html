@@ -220,3 +220,59 @@
     </div>
   </ng-container>
 </section>
+
+<section *ngIf="activeTab() === 'quality-kpi' && !loading()">
+  <div class="alert-info" *ngIf="!selectedProjectId && !error()">
+    Vui lòng chọn dự án ở bộ lọc phía trên để xem KPI chất lượng.
+  </div>
+
+  <ng-container *ngIf="qualityKpiReport()">
+    <div class="kpi-grid">
+      <div class="kpi-card kpi-issue">
+        <span class="kpi-label">Tổng số Issue</span>
+        <span class="kpi-value">{{ qualityKpiReport()!.totalIssues }}</span>
+      </div>
+      <div class="kpi-card kpi-risk">
+        <span class="kpi-label">Escape rate (lọt khỏi QA)</span>
+        <span class="kpi-value">{{ qualityKpiReport()!.escapeRatePercent | number:'1.1-1' }}%</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Defect density / task</span>
+        <span class="kpi-value">{{ qualityKpiReport()!.defectDensityPerTask | number:'1.2-2' }}</span>
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-card">
+        <h4 class="summary-title">Nguồn phát hiện Issue</h4>
+        <table class="report-table">
+          <thead><tr><th>Nguồn</th><th class="num">Số lượng</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Phát hiện trong QA test</td>
+              <td class="num">{{ qualityKpiReport()!.issuesFoundInQa }}</td>
+            </tr>
+            <tr>
+              <td>Lọt ra ngoài (escaped)</td>
+              <td class="num">{{ qualityKpiReport()!.issuesEscaped }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="summary-card">
+        <h4 class="summary-title">Issue theo mức độ nghiêm trọng</h4>
+        <app-empty-state *ngIf="qualityKpiReport()!.issuesBySeverity.length === 0" icon="🐞" title="Không có issue"></app-empty-state>
+        <table class="report-table" *ngIf="qualityKpiReport()!.issuesBySeverity.length > 0">
+          <thead><tr><th>Mức độ</th><th class="num">Số lượng</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let item of qualityKpiReport()!.issuesBySeverity">
+              <td><span class="status-pill" [style.background]="severityColor(item.severity)">{{ severityLabels[item.severity] || item.severity }}</span></td>
+              <td class="num">{{ item.count }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </ng-container>
+</section>
