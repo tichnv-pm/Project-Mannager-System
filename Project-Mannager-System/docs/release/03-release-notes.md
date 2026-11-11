@@ -16,7 +16,7 @@ PM Daily Work Management v1.2.0 nâng cấp toàn diện ứng dụng lên chu�
 ## 3. Kiến trúc & Công nghệ
 
 - **Backend**: Java 21, Spring Boot 3.x, Spring Security + JWT, Spring Data JPA, Flyway, MapStruct, Maven. Database PostgreSQL 16 (AES-256-GCM column encryption).
-- **Frontend**: Angular 22 (standalone, zoneless, signals), Angular Material, Reactive Forms, Vitest, SCSS.
+- **Frontend**: Angular 22 (standalone, zoneless, signals), Angular CDK, Reactive Forms, Vitest, SCSS tự viết (không dùng Angular Material).
 - **E2E Testing**: Playwright framework (`@playwright/test`).
 - **Deploy**: Docker Compose (postgres + backend + frontend-Nginx reverse proxy).
 

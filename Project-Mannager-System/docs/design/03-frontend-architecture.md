@@ -133,7 +133,7 @@ sequenceDiagram
 
 | State | Cách làm |
 |---|---|
-| Loading | `LoadingInterceptor` + `LoadingService` → thanh progress/spinner toàn cục; skeleton (Material `mat-skeleton`) cho list/dashboard |
+| Loading | `LoadingInterceptor` + `LoadingService` → thanh progress/spinner toàn cục (không dùng Angular Material; đã bỏ ý định dùng `mat-skeleton` khi quyết định không đưa Angular Material vào dự án) |
 | Empty | `EmptyStateComponent` (icon + message + action tùy chọn) |
 | Error | `ErrorStateComponent` (message + nút Retry); lỗi API hiển thị qua snackbar/form |
 
@@ -156,7 +156,7 @@ sequenceDiagram
 - Lưu trữ: ISO-8601 UTC (nhận từ API).
 - Hiển thị: chuyển về giờ trình duyệt user (pipe chung `formatDate` + `timezone`).
 - "Hôm nay" (tasks/today, meetings/today, dashboard): gửi kèm timezone offset của client (`tz` param) — Backend tính theo timezone user.
-- Calendar/datepicker Material: dùng locale theo trình duyệt.
+- Calendar/datepicker: component tự viết (không dùng Angular Material), dùng locale theo trình duyệt.
 
 ## 13. Test chiến lược
 

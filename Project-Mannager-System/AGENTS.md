@@ -17,7 +17,7 @@ Giai đoạn hiện tại: **v1.2 — E2E SOFTWARE MANAGEMENT HOÀN TẤT ✔ 20
 ## Công nghệ (đã thống nhất)
 
 - Backend: Java 21, Spring Boot 3.x, Spring Security + JWT, Spring Data JPA, Flyway, Lombok, MapStruct, Bean Validation, Maven, springdoc (Swagger). Package gốc: `com.example.pmdaily`.
-- Frontend: Angular (stable, tương thích Node hiện tại), Angular Material, Reactive Forms, SCSS. Chưa dùng NgRx — dùng service + RxJS.
+- Frontend: Angular 22 (standalone, signals, zoneless), Angular CDK, Reactive Forms, SCSS tự viết (không dùng Angular Material). Chưa dùng NgRx — dùng service + RxJS. E2E: Playwright (`frontend/e2e`).
 - DB: PostgreSQL, PK UUID, `snake_case`, `timestamptz` (lưu UTC, UI hiển thị theo giờ người dùng).
 - Chạy local: Docker Compose (postgres/backend/frontend-Nginx) hoặc thủ công Maven + npm.
 
@@ -51,3 +51,17 @@ Theo kế hoạch cải tiến (đánh giá kiến trúc/code/tài liệu/nghi�
 
 **File cập nhật:** `backend/src/main/java/com/example/pmdaily/git/GitWebhookController.java`, `backend/src/main/resources/application.yml`, `application-local.yml`, `application-test.yml`, `docker-compose.yml`, `.env.example`.
 **Kiểm tra:** `mvn test -Dtest=GitWebhookIntegrationTest` (6/6 PASS trên cả 2 nhánh, xác nhận secret mới hoạt động đúng cho cả GitHub HMAC và GitLab token) + `mvn test` toàn bộ backend trên `develope` sau merge.
+
+**Ghi nhận ngoài phạm vi GĐ 0:** `mvn test` toàn bộ backend trên `develope` cho thấy 2 test PASS trước đó nay FAIL, không liên quan tới thay đổi GĐ 0 (`TaskIntegrationTest.update_member_onlyOwnAssignedTaskLimitedFields`, `TaskIntegrationTest.create_blockedWithoutReason_returns400` — tái hiện cả khi chạy riêng lẻ, không phải do thứ tự test). Chưa sửa trong phiên này; cần xử lý riêng.
+
+## Giai đoạn 2 — Đồng bộ tài liệu với code (2026-11-11)
+
+Theo kế hoạch cải tiến, đã sửa các điểm tài liệu lệch thực tế code (không đổi code/kiến trúc):
+
+- **Angular Material không có thật**: README, AGENTS.md, `docs/00-project-overview.md`, `docs/design/03-frontend-architecture.md`, `docs/release/03-release-notes.md`, `docs/planning/13-gantt-ui-design.md` đều ghi dùng Angular Material — `frontend/package.json` không có dependency này và không có `mat-*` nào trong template. Đã sửa tất cả về đúng thực tế: Angular 22 standalone/signals + Angular CDK + SCSS tự viết, Gantt grid/timeline tự dựng 100%.
+- **Bảng công nghệ `docs/00-project-overview.md` lỗi thời**: sửa "Testcontainers" → H2 (thực tế dùng), "Jasmine/Karma hoặc Jest" → Vitest + Playwright (thực tế dùng).
+- **`docs/01-business-requirements.md` §9**: 5 câu hỏi mở từ v1 chưa từng được đóng dù đã phát hành v1.0–v1.2. Đã rà code để chốt 4/5 câu (UI tiếng Việt, quyết định ghi qua biên bản+audit, không có bước "nhận việc" bắt buộc, Excel chỉ cho Task export còn Report dùng CSV); câu còn lại (quy mô người dùng tối đa) xác nhận là **thật sự chưa có** — không bịa số, để ngỏ.
+- **`docs/07-requirement-traceability-matrix.md`**: thêm mục 8c — traceability tóm tắt (tính năng ↔ migration ↔ API ↔ test) cho 5 tính năng v1.2 (Sprint/QA/Git/Wiki/Finance), vì các tính năng này chưa có bộ tài liệu acceptance/traceability đầy đủ như v1.1; ghi rõ đây vẫn là nợ tài liệu chưa đóng hết.
+
+**File cập nhật:** `README.md`, `AGENTS.md`, `docs/00-project-overview.md`, `docs/01-business-requirements.md`, `docs/07-requirement-traceability-matrix.md`, `docs/design/03-frontend-architecture.md`, `docs/planning/13-gantt-ui-design.md`, `docs/release/03-release-notes.md`.
+**Kiểm tra:** chỉ sửa tài liệu, đối chiếu từng khẳng định với `frontend/package.json`, mã nguồn `frontend/src` (grep `mat-`), và test backend hiện có trước khi ghi là "đã chốt".

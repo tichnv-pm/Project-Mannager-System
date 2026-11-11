@@ -22,11 +22,11 @@
 | [syncfusion ej2-gantt] | Commercial (community license có điều kiện) | Full, cần trả phí | KHÔNG |
 | [angular-gantt ]/ [gantt-elastic] | MIT (gantt-elastic) | angular-gantt cũ/không sync; gantt-elastic cần lập | Đề xuất xem thêm |
 
-**Quyết định (đã chốt 2026-08-07):** dùng **Option A — Tự dựng SVG** (Grid Angular Material + timeline SVG tự vẽ, drag-drop đơn giản bằng SVG pointer events). License sạch 100%, không thêm dependency. Giới hạn hỗ trợ 500 task/plan ở v1.
+**Quyết định (đã chốt 2026-08-07):** dùng **Option A — Tự dựng SVG** (Grid tự viết bằng HTML/SCSS, không dùng Angular Material + timeline SVG tự vẽ, drag-drop đơn giản bằng SVG pointer events). License sạch 100%, không thêm dependency. Giới hạn hỗ trợ 500 task/plan ở v1.
 
 ## 4. Chọn triển khai thực tế (ĐÃ CHỐT)
 
-**Option A — Tự dựng (đã chọn):** Grid table (Angular Material) + timeline vẽ bằng SVG (no-dep). Hỗ trợ drag-drop đơn giản. Cost thấp, license sạch 100%, phù hợp scope v1. Cần xử lý cuộn đồng bộ.
+**Option A — Tự dựng (đã chọn):** Grid table tự viết (HTML/SCSS, không dùng Angular Material) + timeline vẽ bằng SVG (no-dep). Hỗ trợ drag-drop đơn giản. Cost thấp, license sạch 100%, phù hợp scope v1. Cần xử lý cuộn đồng bộ.
 
 **Option B — Frappe Gantt (MIT):** giữ làm fallback không ưu tiên — không cần thêm dependency.
 

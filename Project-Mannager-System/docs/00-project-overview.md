@@ -85,9 +85,9 @@ Chi tiết phân quyền: `docs/05-user-roles-permissions.md` (Prompt 02).
 |---|---|
 | Backend | Java 21, Spring Boot 3.x, Spring Security + JWT, Spring Data JPA, PostgreSQL, Flyway, Lombok, MapStruct, Bean Validation, Maven |
 | API doc | Swagger/OpenAPI (springdoc) |
-| Test Backend | JUnit 5, Mockito, Spring Boot Test, Testcontainers (nếu phù hợp) |
-| Frontend | Angular (bản stable tương thích Node hiện tại), Angular Material, Reactive Forms, HttpClient, Route Guard, HTTP Interceptor, SCSS, Responsive desktop/tablet |
-| Test Frontend | Jasmine/Karma hoặc Jest |
+| Test Backend | JUnit 5, Mockito, Spring Boot Test, H2 (profile `test`, không dùng Testcontainers) |
+| Frontend | Angular 22 (standalone, signals), Angular CDK, Reactive Forms, HttpClient, Route Guard, HTTP Interceptor, SCSS tự viết (không dùng Angular Material), Responsive desktop/tablet |
+| Test Frontend | Vitest (qua Angular builder), Playwright (E2E, `frontend/e2e`) |
 | Local deploy | Docker, Docker Compose (postgres, backend, frontend/Nginx), hoặc chạy thủ công (Maven, npm) |
 | DB migration | Flyway (`V1__init_schema.sql`, `V2__seed_local_data.sql`) |
 

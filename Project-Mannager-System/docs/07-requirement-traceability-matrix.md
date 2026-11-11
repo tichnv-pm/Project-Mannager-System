@@ -144,6 +144,20 @@ Tóm tắt mapping FR ↔ API ↔ AC (chi tiết `docs/api/13-planning-api.md` �
 | PLN-FR-TPL-* | `/plan-templates` | PLN-AC-TPL-* |
 | PLN-FR-PORT-* | `/portfolio` | PLN-AC-PORT-* |
 
+## 8c. E2E Software Management (v1.2) — traceability tóm tắt
+
+Phân hệ v1.2 **chưa có** bộ tài liệu requirement/acceptance/traceability đầy đủ theo đúng khuôn mẫu v1.1 (`docs/planning/01..15` — BR→FR→Module→DB→API→AC chi tiết dạng Given/When/Then). Thiết kế nghiệp vụ & thuật toán nằm ở `docs/08-v1.2-e2e-software-management.md`; bảng dưới ánh xạ tính năng ↔ migration ↔ API ↔ test hiện có để tra cứu nhanh, không thay thế cho acceptance criteria chi tiết còn thiếu.
+
+| Tính năng | Thiết kế (docs/08) | Migration | API | Test |
+|---|---|---|---|---|
+| Agile/Sprints | §1.1, §2.1 | V14, V16 | `SprintController` (`/api/v1/...`) | `SprintIntegrationTest` |
+| QA Testing (test case/run, auto-tạo Issue khi fail) | §2.1 | V15, V16 | `QaController` (`/api/v1/...`) | `QaIntegrationTest` |
+| Git Integration (webhook HMAC, auto chuyển trạng thái task) | §1.3 | V17 | `/api/v1/public/webhooks/git`, `/api/v1/tasks/{id}/git` | `GitWebhookIntegrationTest` |
+| Project Wiki (mẫu chuẩn hóa) | §1.5, §3.2, §3.3 | V12, V13 | `ProjectWikiController` (`/api/v1/...`) | `ProjectWikiIntegrationTest` |
+| EVM Finance (PV/EV/AC/CPI/SPI, mã hóa `hourly_rate` AES-256-GCM) | §1.2, §4 | V18 | `/api/v1/projects/{projectId}/finance` | `ProjectFinanceIntegrationTest` |
+
+**Nợ tài liệu còn lại:** acceptance criteria chi tiết (Given/When/Then) + traceability BR→FR→AC đầy đủ cho 5 tính năng trên, tương đương chuẩn đã làm ở v1.1 — chưa thực hiện trong lần cập nhật này (xem kế hoạch cải tiến, mục Tài liệu, GĐ 2).
+
 ## 9. NFR → Kiểm chứng
 
 | NFR | Kiểm chứng ở giai đoạn | UC liên quan |

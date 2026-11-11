@@ -5,7 +5,7 @@
 ## Công nghệ
 
 - **Backend**: Java 21, Spring Boot 3.x, Spring Security + JWT, Spring Data JPA, Flyway, MapStruct, springdoc (Swagger). Package gốc `com.example.pmdaily`.
-- **Frontend**: Angular (Material, Reactive Forms, SCSS).
+- **Frontend**: Angular 22 (standalone components, signals), Angular CDK, Reactive Forms, SCSS tự viết (không dùng Angular Material), Playwright E2E.
 - **Database**: PostgreSQL 16 (PK UUID, `snake_case`, `timestamptz` UTC).
 - **Local**: Docker Compose (postgres/backend/frontend-Nginx) hoặc chạy thủ công Maven + npm.
 
@@ -58,3 +58,4 @@ docker compose up -d --build
 - Tổng quan + trạng thái các giai đoạn: `docs/00-project-overview.md`
 - Hướng dẫn triển khai local (Windows): `docs/design/07-deployment-design.md`
 - **Giai đoạn v1.1 — Project Planning**: `docs/planning/01..15` (requirement, design, acceptance, traceability), API tại `docs/api/13-planning-api.md`
+- **Giai đoạn v1.2 — E2E Software Management**: thiết kế nghiệp vụ tại `docs/08-v1.2-e2e-software-management.md`, release notes tại `docs/release/03-release-notes.md`, traceability tóm tắt tại `docs/07-requirement-traceability-matrix.md` mục 8c

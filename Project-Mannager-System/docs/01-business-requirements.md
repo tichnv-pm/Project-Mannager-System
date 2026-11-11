@@ -134,10 +134,12 @@ flowchart LR
 
 **Ngoài phạm vi v1:** email/SMS, realtime (WebSocket), mobile app, multi-tenant, đa ngôn ngữ, CI/CD production, module quyết định tách riêng (ghi nhận qua biên bản/notes + audit).
 
-## 9. Điểm cần xác nhận (nghiệp vụ)
+## 9. Điểm đã chốt / còn mở (nghiệp vụ)
 
-1. UI/message tiếng Việt — xác nhận lần cuối?
-2. Quản lý quyết định (nhóm 11): v1 ghi nhận qua biên bản/notes + audit là đủ, hay cần bảng `decisions` riêng?
-3. Nhận việc (accept): bắt buộc member phải "nhận việc" trước khi chuyển IN_PROGRESS, hay chỉ là trạng thái hiển thị?
-4. Export Excel: cần cho task và báo cáo, hay chỉ báo cáo?
-5. Quy mô người dùng tối đa dự kiến (để chốt hiệu năng và phân trang)?
+Mục này ban đầu (v1) là danh sách câu hỏi mở; cập nhật lại theo những gì đã thực sự triển khai qua v1.0–v1.2, để tài liệu khớp code:
+
+1. **UI/message tiếng Việt** — đã chốt: toàn bộ UI và message lỗi dùng tiếng Việt xuyên suốt v1.0–v1.2.
+2. **Quản lý quyết định (nhóm 11)** — đã chốt: ghi nhận qua `conclusion` của họp hoặc `notes` của task + audit log là đủ cho mọi giai đoạn đã phát hành; không có bảng `decisions` riêng (xem mục 8, FR-DEC-01).
+3. **Nhận việc (accept)** — đã chốt: không bắt buộc bước "nhận việc" riêng; `TaskStatus` không có trạng thái ACCEPTED, member chuyển thẳng TODO → IN_PROGRESS (`backend/.../task/TaskStatus.java`).
+4. **Export Excel** — đã chốt: Task export dùng Excel (.xlsx, `TaskService.buildExcel`); Report export dùng CSV (`ReportController`/`ReportService`, không có Excel cho báo cáo).
+5. **Quy mô người dùng tối đa dự kiến** — **còn mở**: chưa có NFR nào định nghĩa số người dùng đồng thời/tổng số dự kiến; hiệu năng và chiến lược phân trang hiện chỉ được kiểm chứng ở quy mô dữ liệu demo/seed, chưa có con số mục tiêu chính thức từ phía nghiệp vụ.
