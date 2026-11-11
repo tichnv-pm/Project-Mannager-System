@@ -41,3 +41,13 @@ Giai đoạn hiện tại: **v1.2 — E2E SOFTWARE MANAGEMENT HOÀN TẤT ✔ 20
 - API prefix `/api/v1`, JSON, ISO-8601, pagination `page/size/sort`; error response thống nhất (`timestamp/status/error/code/message/path/fieldErrors/traceId`).
 - Không trả Entity qua API (DTO + MapStruct); optimistic locking bằng `version`; soft delete cho dữ liệu nghiệp vụ.
 - Secret đọc từ environment variable; application.yml chỉ chứa giá trị mặc định an toàn; profile `local`/`test`.
+
+## Giai đoạn 0 — Vá rủi ro bảo mật & config (2026-11-11, merge từ `claude/tender-albattani-18pxg1` vào `develope`)
+
+Theo kế hoạch cải tiến (đánh giá kiến trúc/code/tài liệu/nghiệp vụ), đã vá rủi ro bảo mật sau, không đổi kiến trúc:
+
+- **Webhook secret không còn hard-code**: `GitWebhookController` trước đây có fallback `git-webhook-secret-key-12345` ngay trong code, trong khi endpoint `/api/v1/public/webhooks/**` là `permitAll()` — nếu quên set biến môi trường, ai cũng giả mạo được webhook. Nay bắt buộc qua `app.webhook.git-secret` → biến môi trường `GIT_WEBHOOK_SECRET` (fail-fast nếu thiếu, giống `JWT_SECRET`), secret mặc định chỉ còn ở profile `local`/`test`.
+- **Flyway target & log level ở `develope`**: nhánh `develope` đã tự giải quyết 2 điểm này theo hướng khác (và đầy đủ hơn) trước khi merge — `flyway.target` cấu hình qua biến môi trường `${FLYWAY_TARGET:latest}` (không hard-code), `application-prod.yml` đã có sẵn connection pool + log level production-ready; giữ nguyên bản của `develope` cho 2 mục này khi merge, chỉ mang theo fix webhook secret từ nhánh kia.
+
+**File cập nhật:** `backend/src/main/java/com/example/pmdaily/git/GitWebhookController.java`, `backend/src/main/resources/application.yml`, `application-local.yml`, `application-test.yml`, `docker-compose.yml`, `.env.example`.
+**Kiểm tra:** `mvn test -Dtest=GitWebhookIntegrationTest` (6/6 PASS trên cả 2 nhánh, xác nhận secret mới hoạt động đúng cho cả GitHub HMAC và GitLab token) + `mvn test` toàn bộ backend trên `develope` sau merge.
