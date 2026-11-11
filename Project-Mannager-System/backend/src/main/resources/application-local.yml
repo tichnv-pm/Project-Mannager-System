@@ -10,3 +10,9 @@ spring:
 app:
   jwt:
     secret: ${JWT_SECRET:local-dev-secret-change-me-at-least-32-chars}
+  webhook:
+    git-secret: ${GIT_WEBHOOK_SECRET:local-dev-git-webhook-secret-change-me}
+
+logging:
+  level:
+    com.example.pmdaily: DEBUG

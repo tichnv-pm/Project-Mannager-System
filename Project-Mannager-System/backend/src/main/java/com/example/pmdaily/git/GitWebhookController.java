@@ -26,7 +26,7 @@ public class GitWebhookController {
     private final GitIntegrationService gitIntegrationService;
     private final ObjectMapper objectMapper;
 
-    @Value("${app.webhook.git-secret:git-webhook-secret-key-12345}")
+    @Value("${app.webhook.git-secret}")
     private String gitWebhookSecret;
 
     public GitWebhookController(GitIntegrationService gitIntegrationService, ObjectMapper objectMapper) {

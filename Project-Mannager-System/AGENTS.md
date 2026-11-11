@@ -41,3 +41,15 @@ Giai đoạn hiện tại: **v1.1 — PROJECT PLANNING HOÀN TẤT ✔ 2026-08-1
 - API prefix `/api/v1`, JSON, ISO-8601, pagination `page/size/sort`; error response thống nhất (`timestamp/status/error/code/message/path/fieldErrors/traceId`).
 - Không trả Entity qua API (DTO + MapStruct); optimistic locking bằng `version`; soft delete cho dữ liệu nghiệp vụ.
 - Secret đọc từ environment variable; application.yml chỉ chứa giá trị mặc định an toàn; profile `local`/`test`.
+
+## Giai đoạn 0 — Vá rủi ro bảo mật & config (2026-11-11)
+
+Theo kế hoạch cải tiến (đánh giá kiến trúc/code/tài liệu/nghiệp vụ), đã vá 3 rủi ro cấu hình/bảo mật, không đổi kiến trúc:
+
+- **Webhook secret không còn hard-code**: `GitWebhookController` trước đây có fallback `git-webhook-secret-key-12345` ngay trong code, trong khi endpoint `/api/v1/public/webhooks/**` là `permitAll()` — nếu quên set biến môi trường, ai cũng giả mạo được webhook. Nay bắt buộc qua `app.webhook.git-secret` (fail-fast nếu thiếu, giống `JWT_SECRET`), secret mặc định chỉ còn ở profile `local`/`test`.
+- **Flyway target không còn "âm thầm" dừng ở V1 ngoài ý muốn**: thêm `application-prod.yml` (`flyway.target: latest`) + chú thích rõ lý do giữ mặc định gốc là `target: 1` (tránh seed dữ liệu demo V2 lọt vào môi trường chưa xác định) trong `application.yml`.
+- **Log level**: `com.example.pmdaily` ở `application.yml` gốc đổi từ `DEBUG` xuống `INFO`; `DEBUG` chỉ còn bật ở `application-local.yml` (dev).
+
+**File cập nhật:** `backend/src/main/java/com/example/pmdaily/git/GitWebhookController.java`, `backend/src/main/resources/application.yml`, `application-local.yml`, `application-test.yml`, `docker-compose.yml`, `.env.example`.
+**File tạo mới:** `backend/src/main/resources/application-prod.yml`.
+**Kiểm tra:** `mvn test -Dtest=GitWebhookIntegrationTest` (6/6 PASS, xác nhận secret mới hoạt động đúng cho cả GitHub HMAC và GitLab token) + `mvn test` toàn bộ backend.

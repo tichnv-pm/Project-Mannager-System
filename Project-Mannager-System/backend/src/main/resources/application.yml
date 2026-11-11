@@ -18,6 +18,9 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    # An toàn theo mặc định: dừng ở V1 để không áp seed dữ liệu demo (V2, mật khẩu demo đã biết)
+    # vào một môi trường chưa xác định. Profile local/test tự override lên "latest".
+    # Môi trường thật PHẢI chạy với profile "prod" (xem application-prod.yml) để áp đủ migration schema.
     target: 1
   jackson:
     time-zone: UTC
@@ -55,10 +58,12 @@ app:
     login:
       max-failed-attempts: ${LOGIN_MAX_FAILED_ATTEMPTS:5}
       lock-duration-minutes: ${LOGIN_LOCK_DURATION_MINUTES:5}
+  webhook:
+    git-secret: ${GIT_WEBHOOK_SECRET}
 
 logging:
   level:
     root: INFO
-    com.example.pmdaily: DEBUG
+    com.example.pmdaily: INFO
   pattern:
     console: "%d{ISO8601} %-5level [%X{traceId}] [%X{userId}] %logger{40} - %msg%n"

@@ -1,0 +1,7 @@
+spring:
+  flyway:
+    # Môi trường thật phải áp đủ toàn bộ migration schema (V1, V3..V18), không dừng ở V1 như mặc định gốc.
+    # Lưu ý: migration V2 (seed dữ liệu demo, mật khẩu đã biết) cũng nằm trong cùng chuỗi migration nên sẽ
+    # được áp dụng cùng "latest" — trước khi dùng profile này cho một môi trường thật, xác nhận lại việc
+    # tách seed dữ liệu demo ra khỏi chuỗi migration chính (xem kế hoạch cải tiến, mục Kiến trúc & Hạ tầng).
+    target: latest
