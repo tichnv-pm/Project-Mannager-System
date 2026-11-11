@@ -11,6 +11,8 @@ import { ActionItemResponse, MeetingAttachment, MeetingResponse, UserBriefRef } 
 import { ProjectService } from '../projects/project.service';
 import { ProjectOption } from '../dashboard/dashboard.model';
 import { UserBrief } from '../../core/models/auth.model';
+import { SprintService } from '../projects/sprints/sprint.service';
+import { SprintResponse } from '../projects/sprints/sprint.model';
 
 type QuickFilter = 'all' | 'today' | 'upcoming' | 'completed';
 
@@ -32,6 +34,7 @@ type QuickFilter = 'all' | 'today' | 'upcoming' | 'completed';
 export class MeetingListComponent implements OnInit, OnDestroy {
   private meetingService = inject(MeetingService);
   private projectService = inject(ProjectService);
+  private sprintService = inject(SprintService);
   private fb = inject(FormBuilder);
   private destroy$ = new Subject<void>();
 
@@ -46,6 +49,7 @@ export class MeetingListComponent implements OnInit, OnDestroy {
   totalPages = signal(0);
   projectsList = signal<ProjectOption[]>([]);
   usersList = signal<UserBrief[]>([]);
+  sprintsList = signal<SprintResponse[]>([]);
 
   // ─── Filter ───────────────────────────────────────────────────
   keyword = '';
@@ -121,6 +125,10 @@ export class MeetingListComponent implements OnInit, OnDestroy {
       location:      [''],
       meetingLink:   [''],
       agenda:        [''],
+      sprintId:      [''],
+    });
+    this.meetingForm.get('projectId')?.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(projectId => {
+      this.loadSprints(projectId);
     });
     this.aiForm = this.fb.group({
       title:      ['', [Validators.required, Validators.maxLength(200)]],
@@ -145,6 +153,17 @@ export class MeetingListComponent implements OnInit, OnDestroy {
   loadOptions(): void {
     this.projectService.getProjectsOptions().subscribe(p => this.projectsList.set(p));
     this.projectService.getUsersList().subscribe(u => this.usersList.set(u));
+  }
+
+  loadSprints(projectId: string): void {
+    if (!projectId) {
+      this.sprintsList.set([]);
+      return;
+    }
+    this.sprintService.getSprints(projectId).subscribe({
+      next: sprints => this.sprintsList.set(sprints || []),
+      error: () => this.sprintsList.set([])
+    });
   }
 
   loadMeetings(): void {
@@ -214,10 +233,11 @@ export class MeetingListComponent implements OnInit, OnDestroy {
     this.isEditMode.set(false);
     this.editingMeetingId = null;
     this.formError.set(null);
+    const initialProjectId = this.projectsList().length > 0 ? this.projectsList()[0].id : '';
     this.meetingForm.reset({
-      projectId: this.projectsList().length > 0 ? this.projectsList()[0].id : '',
+      projectId: initialProjectId,
       title: '', chairpersonId: '', startTime: '', endTime: '',
-      location: '', meetingLink: '', agenda: '',
+      location: '', meetingLink: '', agenda: '', sprintId: '',
     });
     this.showModal.set(true);
   }
@@ -236,6 +256,7 @@ export class MeetingListComponent implements OnInit, OnDestroy {
       location:      m.location || '',
       meetingLink:   m.meetingLink || '',
       agenda:        m.agenda || '',
+      sprintId:      m.sprintId || '',
     });
     this.showModal.set(true);
   }
@@ -259,6 +280,7 @@ export class MeetingListComponent implements OnInit, OnDestroy {
         location: v.location || undefined,
         meetingLink: v.meetingLink || undefined,
         agenda: v.agenda || undefined,
+        sprintId: v.sprintId || undefined,
         version: this.editingVersion,
       }).subscribe({
         next: () => { this.formSubmitting.set(false); this.closeModal(); this.loadMeetings(); },
@@ -272,6 +294,7 @@ export class MeetingListComponent implements OnInit, OnDestroy {
         location: v.location || undefined,
         meetingLink: v.meetingLink || undefined,
         agenda: v.agenda || undefined,
+        sprintId: v.sprintId || undefined,
       }).subscribe({
         next: () => { this.formSubmitting.set(false); this.closeModal(); this.loadMeetings(); },
         error: err => { this.formSubmitting.set(false); this.formError.set(err?.error?.message || 'Tạo cuộc họp thất bại'); }

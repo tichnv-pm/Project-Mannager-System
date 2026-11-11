@@ -323,6 +323,14 @@
             placeholder="1. Điểm tiến độ sprint&#10;2. Thảo luận vấn đề kỹ thuật..." class="form-control"></textarea>
         </div>
 
+        <div class="form-group">
+          <label>Sprint liên quan (VD: Retrospective)</label>
+          <select formControlName="sprintId" class="form-control" id="form-meeting-sprint">
+            <option value="">— Không gắn sprint —</option>
+            <option *ngFor="let s of sprintsList()" [value]="s.id">{{ s.sprintName }}</option>
+          </select>
+        </div>
+
         <div class="modal-footer">
           <button type="button" (click)="closeModal()" class="btn-secondary" id="modal-cancel-meeting">Hủy</button>
           <button type="submit" class="btn-primary" [disabled]="formSubmitting()" id="modal-submit-meeting">

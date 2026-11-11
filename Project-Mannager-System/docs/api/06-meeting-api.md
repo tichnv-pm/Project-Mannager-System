@@ -37,6 +37,7 @@ Lên lịch, cập nhật, hoàn thành (khóa biên bản), xóa mềm cuộc h
 | `status` | string | `SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED` |
 | `fromTime` / `toTime` | datetime | Khoảng thời gian họp |
 | `keyword` | string | LIKE trên title |
+| `sprintId` | uuid | Lọc họp gắn với 1 sprint (VD: Retrospective) — GĐ3 cải tiến |
 
 - **Response `200`** — `PageResponse<MeetingResponse>` (xem 3.3). **Lỗi**: `400 INVALID_DATE_RANGE`.
 
@@ -61,6 +62,7 @@ Lên lịch, cập nhật, hoàn thành (khóa biên bản), xóa mềm cuộc h
 | `participantIds` | uuid[] | — | Không trùng, thuộc project (BR-MEET-03) |
 | `agenda` | string | — | — |
 | `status` | string | — | Mặc định `SCHEDULED` |
+| `sprintId` | uuid | — | Phải thuộc cùng `projectId` (400 nếu khác dự án) — GĐ3 cải tiến |
 
 - **Response `201`** — `MeetingResponse`:
 
@@ -82,6 +84,7 @@ Lên lịch, cập nhật, hoàn thành (khóa biên bản), xóa mềm cuộc h
   "content": null,
   "conclusion": null,
   "createdAt": "2026-07-29T02:00:00Z",
+  "sprintId": null,
   "version": 0
 }
 ```

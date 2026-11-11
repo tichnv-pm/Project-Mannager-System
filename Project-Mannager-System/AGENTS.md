@@ -131,3 +131,13 @@ GĐ3 (Agile/Quality nghiệp vụ) gồm 7 hạng mục, triển khai từng ph�
 **Kiểm tra:** `ReportIntegrationTest` 2/2 PASS; `mvn test` toàn bộ backend; frontend `npm test` 73/73 + `npm run build` thành công.
 
 **Chưa làm (3/7 hạng mục còn lại của GĐ3):** Change Request mở rộng Scope–Schedule–Cost, Retrospective gắn Sprint, màn hình Backlog riêng (tùy chọn).
+
+## Giai đoạn 3 (phần 5/7) — Retrospective gắn Sprint (2026-11-11)
+
+**Thiết kế:** thêm `meetings.sprint_id` (plain UUID, không FK constraint, cùng mẫu `tasks.sprint_id` từ V14) — liên kết tùy chọn, không thêm field `type` phân loại meeting (giữ đơn giản, không ép buộc "Retrospective" phải là 1 loại họp riêng). Validate: `sprintId` (nếu có) phải thuộc cùng `projectId` của họp, sai → `400 BAD_REQUEST`. Filter `GET /meetings?sprintId=` để tìm họp (retro) gắn với 1 sprint, qua đó truy vết action item sau retro về đúng sprint.
+
+**File tạo mới:** `backend/.../db/migration/V23__add_meeting_sprint_link.sql`.
+**File cập nhật:** `Meeting.java` (+sprintId), `MeetingCreateRequest/MeetingUpdateRequest/MeetingResponse` (+sprintId), `MeetingService.java` (+applySprintId validate, +sprintId trong search()), `MeetingSpecification.java` (+sprintId filter), `MeetingController.java` (+query param), `MeetingIntegrationTest.java` (+3 test), frontend `meeting.model.ts`/`meeting.service.ts` (+sprintId), `meeting-list.component.ts/html` (dropdown chọn sprint theo dự án trong form tạo/sửa họp).
+**Kiểm tra:** `MeetingIntegrationTest` 33/33 PASS (30 cũ + 3 mới); `mvn test` toàn bộ backend; frontend `npm test` 73/73 + `npm run build` thành công.
+
+**Còn lại 2/7 hạng mục của GĐ3:** Change Request mở rộng Scope–Schedule–Cost (module Planning, chưa đụng tới trong phiên này — rủi ro/phức tạp cao nhất), màn hình Backlog riêng (tùy chọn, không phải 1 trong 7 hạng mục nghiệp vụ gốc).

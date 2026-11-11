@@ -77,6 +77,8 @@ class MeetingIntegrationTest {
     private ProjectMemberRepository memberRepository;
     @Autowired
     private MeetingRepository meetingRepository;
+    @Autowired
+    private com.example.pmdaily.sprint.SprintRepository sprintRepository;
 
     private UUID adminId;
     private UUID pmUserId;
@@ -93,6 +95,7 @@ class MeetingIntegrationTest {
                 statement.executeUpdate("DELETE FROM meeting_participants");
                 statement.executeUpdate("DELETE FROM attachments");
                 statement.executeUpdate("DELETE FROM meetings");
+                statement.executeUpdate("DELETE FROM sprints");
                 statement.executeUpdate("DELETE FROM project_sequences");
                 statement.executeUpdate("DELETE FROM project_members");
                 statement.executeUpdate("DELETE FROM projects");
@@ -239,7 +242,77 @@ class MeetingIntegrationTest {
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText();
     }
 
+    private String createSprint(String targetProjectId) {
+        com.example.pmdaily.sprint.Sprint sprint = new com.example.pmdaily.sprint.Sprint();
+        sprint.setProjectId(UUID.fromString(targetProjectId));
+        sprint.setSprintName("Sprint test");
+        sprint.setStartDate(LocalDate.now());
+        sprint.setEndDate(LocalDate.now().plusDays(14));
+        sprint.setCreatedBy(pmUserId);
+        sprint.setUpdatedBy(pmUserId);
+        return sprintRepository.save(sprint).getId().toString();
+    }
+
     // ------------------------------------------------------------------ CRUD
+
+    @Test
+    void create_withSprintId_success() throws Exception {
+        String sprintId = createSprint(projectId);
+        String body = """
+                {"projectId":"%s","title":"Retro Sprint 1","startTime":"2026-08-05T02:00:00Z",
+                 "endTime":"2026-08-05T03:00:00Z","chairpersonId":"%s","participantIds":[],
+                 "location":"Phòng họp 2","sprintId":"%s"}
+                """.formatted(projectId, pmUserId, sprintId);
+
+        mockMvc.perform(post("/api/v1/meetings")
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.sprintId").value(sprintId));
+    }
+
+    @Test
+    void create_withSprintFromDifferentProject_returns400() throws Exception {
+        String otherProjectId = createProject("PRJ201", pmUserId);
+        String sprintId = createSprint(otherProjectId);
+        String body = """
+                {"projectId":"%s","title":"Retro sai sprint","startTime":"2026-08-05T02:00:00Z",
+                 "endTime":"2026-08-05T03:00:00Z","chairpersonId":"%s","participantIds":[],
+                 "location":"Phòng họp 2","sprintId":"%s"}
+                """.formatted(projectId, pmUserId, sprintId);
+
+        mockMvc.perform(post("/api/v1/meetings")
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void list_filterBySprintId_returnsOnlyLinkedMeetings() throws Exception {
+        String sprintId = createSprint(projectId);
+        String linkedBody = """
+                {"projectId":"%s","title":"Retro gắn sprint","startTime":"2026-08-05T02:00:00Z",
+                 "endTime":"2026-08-05T03:00:00Z","chairpersonId":"%s","participantIds":[],
+                 "location":"Phòng họp 2","sprintId":"%s"}
+                """.formatted(projectId, pmUserId, sprintId);
+        mockMvc.perform(post("/api/v1/meetings")
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(linkedBody))
+                .andExpect(status().isCreated());
+        createMeeting(pm(), "Họp không gắn sprint", "2026-08-06T02:00:00Z", "2026-08-06T03:00:00Z",
+                pmUserId.toString(), "[]");
+
+        mockMvc.perform(get("/api/v1/meetings")
+                        .header("Authorization", bearer(pm()))
+                        .param("projectId", projectId)
+                        .param("sprintId", sprintId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("Retro gắn sprint"));
+    }
 
     @Test
     void create_success_returns201WithDefaultStatusAndParticipants() throws Exception {

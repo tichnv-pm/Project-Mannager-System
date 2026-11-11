@@ -25,5 +25,6 @@ public record MeetingUpdateRequest(
         List<UUID> participantIds,
         String agenda,
         MeetingStatus status,
+        UUID sprintId,
         @NotNull Long version) {
 }

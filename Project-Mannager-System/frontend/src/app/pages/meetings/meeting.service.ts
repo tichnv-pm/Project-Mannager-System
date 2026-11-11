@@ -27,6 +27,7 @@ export class MeetingService {
     status?: string;
     fromTime?: string;
     toTime?: string;
+    sprintId?: string;
     page?: number;
     size?: number;
     sort?: string;
@@ -41,6 +42,7 @@ export class MeetingService {
     if (params.status)    p = p.set('status', params.status);
     if (params.fromTime)  p = p.set('fromTime', params.fromTime);
     if (params.toTime)    p = p.set('toTime', params.toTime);
+    if (params.sprintId)  p = p.set('sprintId', params.sprintId);
 
     return this.http.get<PageResponse<MeetingResponse>>(this.API, { params: p });
   }

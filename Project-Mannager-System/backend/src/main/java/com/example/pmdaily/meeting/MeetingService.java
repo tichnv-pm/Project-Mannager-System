@@ -48,6 +48,7 @@ import com.example.pmdaily.project.ProjectMemberRepository;
 import com.example.pmdaily.project.ProjectMemberRole;
 import com.example.pmdaily.project.ProjectRepository;
 import com.example.pmdaily.security.UserPrincipal;
+import com.example.pmdaily.sprint.SprintRepository;
 import com.example.pmdaily.task.Attachment;
 import com.example.pmdaily.task.AttachmentRepository;
 import com.example.pmdaily.task.dto.AttachmentResponse;
@@ -88,6 +89,7 @@ public class MeetingService {
     private final MeetingMapper mapper;
     private final ActionItemMapper actionItemMapper;
     private final AuditService auditService;
+    private final SprintRepository sprintRepository;
 
     @Value("${app.storage.path:./uploads}")
     private String storagePath;
@@ -101,7 +103,8 @@ public class MeetingService {
             UserRepository userRepository,
             MeetingMapper mapper,
             ActionItemMapper actionItemMapper,
-            AuditService auditService) {
+            AuditService auditService,
+            SprintRepository sprintRepository) {
         this.meetingRepository = meetingRepository;
         this.participantRepository = participantRepository;
         this.attachmentRepository = attachmentRepository;
@@ -112,6 +115,7 @@ public class MeetingService {
         this.mapper = mapper;
         this.actionItemMapper = actionItemMapper;
         this.auditService = auditService;
+        this.sprintRepository = sprintRepository;
     }
 
     // ------------------------------------------------------------------ CRUD
@@ -133,6 +137,7 @@ public class MeetingService {
         meeting.setChairperson(findProjectMemberUser(project, request.chairpersonId()));
         meeting.setAgenda(request.agenda());
         meeting.setStatus(request.status() != null ? request.status() : MeetingStatus.SCHEDULED);
+        applySprintId(meeting, request.sprintId(), project);
         Meeting saved = meetingRepository.save(meeting);
 
         List<UUID> participantIds = request.participantIds() != null ? request.participantIds() : List.of();
@@ -155,7 +160,7 @@ public class MeetingService {
     @Transactional(readOnly = true)
     public PageResponse<MeetingResponse> search(UserPrincipal actor,
             String keyword, UUID projectId, MeetingStatus status,
-            Instant fromTime, Instant toTime,
+            Instant fromTime, Instant toTime, UUID sprintId,
             int page, int size, String sort) {
         validatePagination(page, size);
         if (fromTime != null && toTime != null && fromTime.isAfter(toTime)) {
@@ -167,7 +172,8 @@ public class MeetingService {
                 .and(MeetingSpecification.keyword(keyword))
                 .and(MeetingSpecification.projectId(projectId))
                 .and(MeetingSpecification.statuses(status))
-                .and(MeetingSpecification.timeRange(fromTime, toTime));
+                .and(MeetingSpecification.timeRange(fromTime, toTime))
+                .and(MeetingSpecification.sprintId(sprintId));
         if (!isAdminOrPm(actor)) {
             if (projectId != null && !isMember(projectId, actor.getId())) {
                 throw new BusinessException(ErrorCode.ACCESS_DENIED);
@@ -223,6 +229,7 @@ public class MeetingService {
         if (request.status() != null) {
             meeting.setStatus(request.status());
         }
+        applySprintId(meeting, request.sprintId(), meeting.getProject());
         Meeting saved = meetingRepository.save(meeting);
 
         if (request.participantIds() != null) {
@@ -429,6 +436,17 @@ public class MeetingService {
             throw new BusinessException(ErrorCode.BAD_REQUEST,
                     "Phải nhập ít nhất địa điểm hoặc link họp (BR-MEET-04)");
         }
+    }
+
+    private void applySprintId(Meeting meeting, UUID sprintId, Project project) {
+        if (sprintId == null) {
+            meeting.setSprintId(null);
+            return;
+        }
+        sprintRepository.findByIdAndDeletedAtIsNull(sprintId)
+                .filter(s -> s.getProjectId().equals(project.getId()))
+                .orElseThrow(() -> new BusinessException(ErrorCode.BAD_REQUEST, "Sprint không hợp lệ cho dự án này"));
+        meeting.setSprintId(sprintId);
     }
 
     private MeetingResponse toResponse(Meeting meeting) {

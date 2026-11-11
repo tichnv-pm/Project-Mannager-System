@@ -32,5 +32,6 @@ public record MeetingResponse(
         List<AttachmentResponse> attachments,
         List<ActionItemSummary> actionItems,
         Instant createdAt,
+        UUID sprintId,
         long version) {
 }

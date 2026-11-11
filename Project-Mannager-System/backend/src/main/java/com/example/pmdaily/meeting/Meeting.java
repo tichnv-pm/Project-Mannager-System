@@ -63,4 +63,7 @@ public class Meeting extends SoftDeleteEntity {
 
     @Column(name = "conclusion")
     private String conclusion;
+
+    @Column(name = "sprint_id")
+    private java.util.UUID sprintId;
 }

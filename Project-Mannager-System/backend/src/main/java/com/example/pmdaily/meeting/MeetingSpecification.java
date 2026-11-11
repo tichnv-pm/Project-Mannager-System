@@ -38,6 +38,13 @@ public final class MeetingSpecification {
         return (root, query, cb) -> cb.equal(root.get("project").get("id"), projectId);
     }
 
+    public static Specification<Meeting> sprintId(UUID sprintId) {
+        if (sprintId == null) {
+            return null;
+        }
+        return (root, query, cb) -> cb.equal(root.get("sprintId"), sprintId);
+    }
+
     public static Specification<Meeting> statuses(MeetingStatus status) {
         if (status == null) {
             return null;

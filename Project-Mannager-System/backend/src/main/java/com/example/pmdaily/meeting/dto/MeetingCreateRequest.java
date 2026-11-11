@@ -24,5 +24,6 @@ public record MeetingCreateRequest(
         @NotNull UUID chairpersonId,
         List<UUID> participantIds,
         String agenda,
-        MeetingStatus status) {
+        MeetingStatus status,
+        UUID sprintId) {
 }

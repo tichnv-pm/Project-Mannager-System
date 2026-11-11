@@ -155,6 +155,7 @@ Phân hệ v1.2 **chưa có** bộ tài liệu requirement/acceptance/traceabili
 | Velocity + Burndown (GĐ3 cải tiến) | — | V21 | `GET /sprints/{id}/velocity`, `/burndown`, `/projects/{id}/sprints/velocity-trend` | `SprintIntegrationTest` |
 | Definition of Done (GĐ3 cải tiến) | BR-TASK-20 (docs/04) | V22 | `ProjectDodItemController` (`/api/v1/projects/{id}/dod-items`), gate ở `PUT /tasks/{id}/status` | `ProjectDodItemIntegrationTest`, `TaskIntegrationTest` |
 | KPI chất lượng — defect density/escape rate (GĐ3 cải tiến) | docs/api/12 §3.6 | — (đọc trực tiếp `issues`/`tasks`) | `GET /api/v1/reports/quality-kpi` | `ReportIntegrationTest` |
+| Retrospective gắn Sprint (GĐ3 cải tiến) | docs/api/06 §3.1, §3.3 | V23 | `meetings.sprintId` — filter `GET /meetings?sprintId=` | `MeetingIntegrationTest` |
 | QA Testing (test case/run, auto-tạo Issue khi fail) | §2.1 | V15, V16 | `QaController` (`/api/v1/...`) | `QaIntegrationTest` |
 | Git Integration (webhook HMAC, auto chuyển trạng thái task) | §1.3 | V17 | `/api/v1/public/webhooks/git`, `/api/v1/tasks/{id}/git` | `GitWebhookIntegrationTest` |
 | Project Wiki (mẫu chuẩn hóa) | §1.5, §3.2, §3.3 | V12, V13 | `ProjectWikiController` (`/api/v1/...`) | `ProjectWikiIntegrationTest` |

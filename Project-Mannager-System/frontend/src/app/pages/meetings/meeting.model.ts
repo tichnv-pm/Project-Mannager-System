@@ -58,6 +58,7 @@ export interface MeetingResponse {
   actionItemCount?: number;
   actionItems?: ActionItemResponse[];
   createdAt: string;
+  sprintId?: string;
   version: number;
 }
 
@@ -72,6 +73,7 @@ export interface MeetingCreateRequest {
   participantIds?: string[];
   agenda?: string;
   status?: MeetingStatus;
+  sprintId?: string;
 }
 
 export interface MeetingUpdateRequest {
@@ -84,6 +86,7 @@ export interface MeetingUpdateRequest {
   participantIds?: string[];
   agenda?: string;
   status?: MeetingStatus;
+  sprintId?: string;
   version: number;
 }
 

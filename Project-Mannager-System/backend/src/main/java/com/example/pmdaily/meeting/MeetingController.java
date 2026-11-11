@@ -63,8 +63,9 @@ public class MeetingController {
             @RequestParam(required = false) UUID projectId,
             @RequestParam(required = false) MeetingStatus status,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant fromTime,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant toTime) {
-        return meetingService.search(actor, keyword, projectId, status, fromTime, toTime, page, size, sort);
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant toTime,
+            @RequestParam(required = false) UUID sprintId) {
+        return meetingService.search(actor, keyword, projectId, status, fromTime, toTime, sprintId, page, size, sort);
     }
 
     @GetMapping("/today")
