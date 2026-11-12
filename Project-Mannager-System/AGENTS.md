@@ -234,3 +234,10 @@ Sau khi deploy GĐ0–GĐ4 lên Render (Neon Postgres thật), test trực tiế
 **Kiểm tra:** `TaskIntegrationTest` 61/61 PASS; `mvn test` toàn bộ backend; frontend `npm test` 73/73 PASS + `npm run build` thành công; đã verify lại trên chính Render production sau deploy (Story giữ `storyPoints` sau khi đổi sprint, Backlog tab tải được).
 
 **Phát hiện bảo mật nghiêm trọng, ngoài phạm vi sửa code (cần quyết định của PM):** tài khoản demo (`admin`/`Admin@123`, `pm.minh`/`Pm@12345`, `member1`/`Member@123`...) ghi trong README **đang hoạt động thật trên production** (seed V2 đã áp dụng lên Neon thật) — bất kỳ ai đọc README public trên GitHub đều đăng nhập được với quyền ADMIN. Chưa xử lý (đợi xác nhận của PM) — khuyến nghị đổi mật khẩu các tài khoản này trên production hoặc xóa seed data demo khỏi DB thật.
+
+## Backlog: thêm chế độ xem dạng bảng danh sách (2026-11-12)
+
+Theo yêu cầu người dùng khi đang test tính năng — `BacklogBoardComponent` trước đây chỉ có 1 cách xem (bảng kéo-thả theo cột Epic). Thêm nút chuyển "🗂️ Bảng" / "📃 Danh sách" ở đầu màn hình: dạng danh sách là 1 bảng phẳng toàn bộ Story/Task (không gồm Epic) với cột Mã/Loại/Tiêu đề/Epic/Trạng thái/Story Point/Người thực hiện — dùng chung dữ liệu đã tải (`allTasks` tách ra cùng lúc với `childrenMap` trong `applyTasks()`, không gọi API thêm). Chỉ đổi frontend, không đụng backend/API.
+
+**File cập nhật:** `backlog-board.component.ts` (+`viewMode`, +`allTasks`, +`setViewMode`, +`epicNameOf`), `.html` (+toggle, +bảng danh sách dùng `app-status-chip` có sẵn), `.scss` (+style toggle/bảng).
+**Kiểm tra:** `npm test` 73/73 PASS; `npm run build` thành công, không cảnh báo budget.

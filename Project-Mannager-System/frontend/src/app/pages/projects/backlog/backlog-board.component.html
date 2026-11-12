@@ -1,7 +1,13 @@
 <div class="backlog-board">
   <div class="header-actions">
     <h3>📋 Backlog</h3>
-    <button *hasPermission="'task:create'" (click)="openAddEpic()" class="btn-primary">➕ Tạo Epic mới</button>
+    <div class="header-actions-right">
+      <div class="view-toggle">
+        <button class="view-toggle-btn" [class.active]="viewMode() === 'board'" (click)="setViewMode('board')">🗂️ Bảng</button>
+        <button class="view-toggle-btn" [class.active]="viewMode() === 'table'" (click)="setViewMode('table')">📃 Danh sách</button>
+      </div>
+      <button *hasPermission="'task:create'" (click)="openAddEpic()" class="btn-primary">➕ Tạo Epic mới</button>
+    </div>
   </div>
 
   <p class="hint">
@@ -26,7 +32,7 @@
     <button (click)="load()" class="btn-secondary">Tải lại</button>
   </div>
 
-  <div *ngIf="!loading() && !error()" class="board-columns" cdkDropListGroup>
+  <div *ngIf="!loading() && !error() && viewMode() === 'board'" class="board-columns" cdkDropListGroup>
     <!-- Cột "Chưa gán Epic" luôn ở đầu -->
     <div class="board-column unassigned-column">
       <div class="col-head">
@@ -105,5 +111,36 @@
       title="Dự án chưa có Epic nào"
       description="Tạo Epic đầu tiên để bắt đầu nhóm backlog, hoặc để Story/Task nằm trong cột 'Chưa gán Epic'.">
     </app-empty-state>
+  </div>
+
+  <!-- ─── Dạng bảng danh sách ─────────────────────────────────────── -->
+  <div *ngIf="!loading() && !error() && viewMode() === 'table'" class="table-view">
+    <app-empty-state *ngIf="allTasks().length === 0"
+      title="Chưa có Story/Task nào" description="Chuyển sang dạng Bảng để tạo Epic/Story mới.">
+    </app-empty-state>
+    <table class="backlog-table" *ngIf="allTasks().length > 0">
+      <thead>
+        <tr>
+          <th>Mã</th>
+          <th>Loại</th>
+          <th>Tiêu đề</th>
+          <th>Epic</th>
+          <th>Trạng thái</th>
+          <th>Story Point</th>
+          <th>Người thực hiện</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let t of allTasks()">
+          <td class="task-code">{{ t.code }}</td>
+          <td><span class="type-badge type-{{ t.type | lowercase }}">{{ t.type }}</span></td>
+          <td class="col-title-cell">{{ t.title }}</td>
+          <td>{{ epicNameOf(t) }}</td>
+          <td><app-status-chip [status]="t.status"></app-status-chip></td>
+          <td class="num-cell">{{ t.storyPoints || '—' }}</td>
+          <td>{{ t.assignee?.fullName || '—' }}</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </div>

@@ -6,13 +6,16 @@ import { TaskService } from '../../tasks/task.service';
 import { TaskSummaryResponse } from '../../tasks/task.model';
 import { HasPermissionDirective } from '../../../shared/directives/has-permission.directive';
 import { EmptyStateComponent } from '../../../shared/components/empty-state.component';
+import { StatusChipComponent } from '../../../shared/components/status-chip.component';
 
 const UNASSIGNED_KEY = 'none';
+
+type ViewMode = 'board' | 'table';
 
 @Component({
   selector: 'app-backlog-board',
   standalone: true,
-  imports: [CommonModule, FormsModule, DragDropModule, HasPermissionDirective, EmptyStateComponent],
+  imports: [CommonModule, FormsModule, DragDropModule, HasPermissionDirective, EmptyStateComponent, StatusChipComponent],
   templateUrl: './backlog-board.component.html',
   styleUrls: ['./backlog-board.component.scss']
 })
@@ -27,8 +30,11 @@ export class BacklogBoardComponent implements OnInit {
   error = signal<string | null>(null);
   busy = signal(false);
 
+  viewMode = signal<ViewMode>('board');
+
   epics = signal<TaskSummaryResponse[]>([]);
   childrenMap = signal<Record<string, TaskSummaryResponse[]>>({});
+  allTasks = signal<TaskSummaryResponse[]>([]);
 
   // "+ thêm" nhanh (epic mới hoặc story dưới 1 cột)
   addingEpic = signal(false);
@@ -71,14 +77,28 @@ export class BacklogBoardComponent implements OnInit {
     const epicIds = new Set(epics.map(e => e.id));
     const map: Record<string, TaskSummaryResponse[]> = { [UNASSIGNED_KEY]: [] };
     epics.forEach(e => (map[e.id] = []));
+    const nonEpicTasks: TaskSummaryResponse[] = [];
     for (const t of all) {
       if (t.type === 'EPIC') continue;
+      nonEpicTasks.push(t);
       const key = t.parentTaskId && epicIds.has(t.parentTaskId) ? t.parentTaskId : UNASSIGNED_KEY;
       map[key].push(t);
     }
     this.epics.set(epics);
     this.childrenMap.set(map);
+    this.allTasks.set(nonEpicTasks);
     this.loading.set(false);
+  }
+
+  setViewMode(mode: ViewMode): void {
+    this.viewMode.set(mode);
+  }
+
+  /** Tên Epic của 1 task cho dạng bảng danh sách — "Chưa gán Epic" nếu không thuộc Epic nào. */
+  epicNameOf(task: TaskSummaryResponse): string {
+    if (!task.parentTaskId) return 'Chưa gán Epic';
+    const epic = this.epics().find(e => e.id === task.parentTaskId);
+    return epic ? epic.title : 'Chưa gán Epic';
   }
 
   columnTasks(key: string): TaskSummaryResponse[] {

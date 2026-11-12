@@ -8,10 +8,41 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
 
     h3 {
       margin: 0;
       color: #e2e8f0;
+    }
+
+    .header-actions-right {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+  }
+
+  .view-toggle {
+    display: flex;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 2px;
+
+    .view-toggle-btn {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      font-size: 0.8rem;
+      padding: 6px 12px;
+      border-radius: 7px;
+      cursor: pointer;
+
+      &.active {
+        background: #3b82f6;
+        color: #fff;
+      }
     }
   }
 
@@ -184,6 +215,52 @@
 
     .form-control {
       flex: 1;
+    }
+  }
+
+  // ─── Dạng bảng danh sách ──────────────────────────────────────
+  .table-view {
+    overflow-x: auto;
+  }
+
+  .backlog-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+
+    th, td {
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 8px 12px;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    th {
+      background: rgba(255, 255, 255, 0.04);
+      color: #94a3b8;
+      font-size: 0.76rem;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .task-code {
+      font-family: monospace;
+      color: #3b82f6;
+      font-size: 0.78rem;
+    }
+
+    .col-title-cell {
+      color: #f1f5f9;
+      white-space: normal;
+      min-width: 220px;
+    }
+
+    .num-cell {
+      text-align: center;
+    }
+
+    tbody tr:hover {
+      background: rgba(255, 255, 255, 0.03);
     }
   }
 }
