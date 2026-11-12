@@ -45,27 +45,40 @@ export class BacklogBoardComponent implements OnInit {
   load(): void {
     this.loading.set(true);
     this.error.set(null);
-    this.taskService.getTasks({ projectId: this.projectId, size: 500, sort: 'createdAt,asc' }).subscribe({
+    this.fetchAllTasks(0, []);
+  }
+
+  /** API giới hạn size tối đa 100/trang — lấy hết toàn bộ task của project qua nhiều trang (Backlog cần đủ dữ liệu để nhóm theo Epic, không phân trang trên UI). */
+  private fetchAllTasks(page: number, accumulated: TaskSummaryResponse[]): void {
+    this.taskService.getTasks({ projectId: this.projectId, page, size: 100, sort: 'createdAt,asc' }).subscribe({
       next: (res) => {
-        const all = res.content || [];
-        const epics = all.filter(t => t.type === 'EPIC');
-        const epicIds = new Set(epics.map(e => e.id));
-        const map: Record<string, TaskSummaryResponse[]> = { [UNASSIGNED_KEY]: [] };
-        epics.forEach(e => (map[e.id] = []));
-        for (const t of all) {
-          if (t.type === 'EPIC') continue;
-          const key = t.parentTaskId && epicIds.has(t.parentTaskId) ? t.parentTaskId : UNASSIGNED_KEY;
-          map[key].push(t);
+        const all = accumulated.concat(res.content || []);
+        if (res.hasNext) {
+          this.fetchAllTasks(page + 1, all);
+        } else {
+          this.applyTasks(all);
         }
-        this.epics.set(epics);
-        this.childrenMap.set(map);
-        this.loading.set(false);
       },
       error: (err) => {
         this.error.set(err.message || 'Không thể tải Backlog');
         this.loading.set(false);
       }
     });
+  }
+
+  private applyTasks(all: TaskSummaryResponse[]): void {
+    const epics = all.filter(t => t.type === 'EPIC');
+    const epicIds = new Set(epics.map(e => e.id));
+    const map: Record<string, TaskSummaryResponse[]> = { [UNASSIGNED_KEY]: [] };
+    epics.forEach(e => (map[e.id] = []));
+    for (const t of all) {
+      if (t.type === 'EPIC') continue;
+      const key = t.parentTaskId && epicIds.has(t.parentTaskId) ? t.parentTaskId : UNASSIGNED_KEY;
+      map[key].push(t);
+    }
+    this.epics.set(epics);
+    this.childrenMap.set(map);
+    this.loading.set(false);
   }
 
   columnTasks(key: string): TaskSummaryResponse[] {
