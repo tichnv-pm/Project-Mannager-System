@@ -52,6 +52,7 @@ Phạm vi áp dụng (v1): dùng để hiển thị và hỗ trợ các quy tắ
 | `dashboard:view` | Xem dashboard |
 | `report:view` | Xem báo cáo |
 | `report:export` | Export báo cáo |
+| `report:share` | Tạo/thu hồi share-link báo cáo tiến độ cho stakeholder ngoài tổ chức (GĐ4 cải tiến) |
 | `notification:view` | Xem thông báo của mình |
 | `notification:manage` | Đánh dấu đã đọc |
 | `audit:view` | Xem nhật ký hoạt động |
@@ -101,6 +102,7 @@ Phạm vi áp dụng (v1): dùng để hiển thị và hỗ trợ các quy tắ
 | `dashboard:view` | ✔ | ✔ | ✔ (phạm vi project của mình) | ✔ (phạm vi project của mình) |
 | `report:view` | ✔ | ✔ | — | ✔ |
 | `report:export` | ✔ | ✔ | — | — |
+| `report:share` | ✔ | ✔ (PM dự án) | — | — |
 | `notification:view` | ✔ | ✔ | ✔ | ✔ |
 | `notification:manage` | ✔ | ✔ | ✔ | ✔ |
 | `audit:view` | ✔ | — | — | — |

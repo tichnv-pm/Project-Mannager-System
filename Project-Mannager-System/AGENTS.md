@@ -199,4 +199,23 @@ Production chạy trên **Neon Postgres** (`render.yaml`), nên chiến lược 
 **File cập nhật:** `docs/design/07-deployment-design.md` (+mục 13).
 **Kiểm tra:** `bash -n` cả 2 script (cú pháp hợp lệ) + test logic parse JDBC URL cho cả 2 kiểu (Neon có `sslmode=require`, docker-compose local không có query string) — **chưa chạy restore thật** vì phiên này không có Neon branch thử nghiệm hoặc Postgres thật để kiểm chứng full cycle; cần làm trước khi dùng thật trên production.
 
-**Còn lại 1/3 hạng mục GĐ4:** Stakeholder report (share-link/PDF cho người ngoài tổ chức) — public-facing, rủi ro bảo mật, đang thiết kế scoping riêng.
+## Giai đoạn 4 (phần 3/3) — Stakeholder report: share-link cho người ngoài tổ chức (2026-11-12)
+
+PM duyệt làm cả 3 hạng mục GĐ4, nhưng hạng mục này public-facing (rủi ro bảo mật cao nhất GĐ4) nên scoping chặt trước khi code:
+
+**Phạm vi:** chỉ chia sẻ **1 báo cáo** — Project Progress (% tiến độ + done/total task, đã có sẵn ở `GET /reports/project-progress`) — không mở rộng sang EVM/Risk/Issue (dữ liệu nhạy cảm hơn, ngoài phạm vi stakeholder cần xem). "PDF" dùng `window.print()` (CSS `@media print`), không thêm thư viện PDF mới.
+
+**Thiết kế:**
+- **Token = chính `id` (UUID) của bản ghi** `report_share_links` — cùng quy ước "UUID không đoán được" dùng cho mọi entity khác trong hệ thống, không thêm cột token riêng.
+- **Revoke = soft delete** (`deletedAt`), không thêm field riêng. Hết hạn (`expiresAt`, tùy chọn) kiểm tra cùng lúc với revoke qua `ReportShareLink.isActive()`.
+- **Tạo/thu hồi link yêu cầu quyền `report:share` mới** (nghiêm hơn `report:view` — ADMIN/PM dự án, không có MEMBER) vì đây là hành động public-facing thật sự khác về rủi ro so với chỉ xem báo cáo nội bộ.
+- **Endpoint public** `GET /api/v1/public/shared-reports/{token}` — `permitAll` (cùng mẫu `/api/v1/public/webhooks/**`), có `RateLimitFilter` riêng (30 req/60s/IP, chống dò token). Lỗi luôn `404` đồng nhất cho cả 3 trường hợp (chưa tồn tại/đã thu hồi/đã hết hạn) — không phân biệt qua message, tránh lộ thông tin cho người dò token.
+- **Tái dùng tối đa:** `ReportService.getProjectProgress()` đã có logic SQL tính progress theo RBAC actor — tách thêm `getProjectProgressByProjectId(projectId)` (không qua actor, vì quyền đã xác thực riêng qua token) dùng chung đúng 1 câu SQL, không viết lại.
+- **Frontend:** quản lý link (tạo/copy/thu hồi) ngay trong tab "📈 Tiến độ dự án" ở màn hình Report (chỉ hiện khi có `report:share`); xem công khai ở route riêng `/public/shared-reports/:token` — **ngoài** `MainLayoutComponent`/`authGuard` (route đứng độc lập trong `app.routes.ts`, trước route `**`), trang sáng màu riêng (không dùng dark theme nội bộ) vì là trang gửi cho khách hàng/nhà đầu tư.
+
+**File tạo mới:** `backend/.../db/migration/V25__add_report_share_links.sql` (bảng + seed quyền `report:share` cho ADMIN/PROJECT_MANAGER), `ReportShareLink.java`, `ReportShareLinkRepository.java`, `ReportShareLinkService.java`, `ReportShareLinkController.java`, `PublicReportController.java`, `dto/{ReportShareLinkCreateRequest,ReportShareLinkResponse,PublicProjectProgressResponse}.java`, `ReportShareLinkIntegrationTest.java` (4 test). Frontend: `report.service.ts` (+model, +4 API), `public-shared-report.component.{ts,html,scss}`.
+**File cập nhật:** `ReportService.java` (+getProjectProgressByProjectId), `SecurityConfig.java` (+permitAll `/api/v1/public/shared-reports/**`), `RateLimitFilter.java` (+rule shared-report), `application.yml` (+rate-limit.shared-report), `app.routes.ts` (+route public), `report-list.component.ts/html/scss` (+UI quản lý link trong tab Tiến độ dự án), docs: `docs/api/12-report-audit-api.md` (+§3.8, renumber audit-logs 3.8→3.9), `docs/05-user-roles-permissions.md` (+`report:share`), `docs/07-requirement-traceability-matrix.md`.
+
+**Kiểm tra:** `ReportShareLinkIntegrationTest` 4/4 PASS; `mvn test` toàn bộ backend 331/331 PASS; frontend `npm test` 73/73 PASS + `npm run build` thành công, không cảnh báo budget.
+
+**GĐ4 (Hạ tầng/Observability) — HOÀN TẤT 3/3 hạng mục** (Actuator metrics, Backup/restore PostgreSQL, Stakeholder report share-link).

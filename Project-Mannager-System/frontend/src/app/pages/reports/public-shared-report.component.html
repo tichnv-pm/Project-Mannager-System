@@ -1,0 +1,34 @@
+<div class="public-report-page">
+  <div *ngIf="loading()" class="state-box">Đang tải báo cáo...</div>
+
+  <div *ngIf="error() && !loading()" class="state-box error-box">
+    ⚠️ {{ error() }}
+  </div>
+
+  <div *ngIf="report() && !loading()" class="report-card">
+    <div class="report-header">
+      <div>
+        <div class="brand">📊 PM Daily Work Management</div>
+        <h1>{{ report()!.projectName }}</h1>
+        <div class="project-code">{{ report()!.projectCode }}</div>
+      </div>
+      <button class="print-btn" (click)="print()">🖨️ In / Lưu PDF</button>
+    </div>
+
+    <div *ngIf="report()!.label" class="report-label">{{ report()!.label }}</div>
+
+    <div class="progress-block">
+      <div class="progress-pct">{{ report()!.progress }}%</div>
+      <div class="progress-track">
+        <div class="progress-fill" [style.width.%]="report()!.progress"></div>
+      </div>
+      <div class="progress-meta">
+        Hoàn thành <strong>{{ report()!.doneTasks }}</strong> / {{ report()!.totalTasks }} công việc
+      </div>
+    </div>
+
+    <div class="generated-at">
+      Dữ liệu tạo lúc {{ report()!.generatedAt | date:'dd/MM/yyyy HH:mm' }} (giờ UTC)
+    </div>
+  </div>
+</div>

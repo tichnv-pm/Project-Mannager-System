@@ -70,6 +70,9 @@ app:
       webhook:
         max-requests: ${RATE_LIMIT_WEBHOOK_MAX:60}
         window-seconds: ${RATE_LIMIT_WEBHOOK_WINDOW_SECONDS:60}
+      shared-report:
+        max-requests: ${RATE_LIMIT_SHARED_REPORT_MAX:30}
+        window-seconds: ${RATE_LIMIT_SHARED_REPORT_WINDOW_SECONDS:60}
   webhook:
     git-secret: ${GIT_WEBHOOK_SECRET}
 

@@ -165,6 +165,33 @@ public class ReportService {
         return new ProjectProgressReportResponse(items);
     }
 
+    /**
+     * Progress của 1 project cụ thể, không qua RBAC theo actor — dùng cho share-link stakeholder
+     * (GĐ4 cải tiến): quyền truy cập đã được xác thực riêng qua token share-link trước khi gọi vào
+     * đây (xem ReportShareLinkService), không phải qua actor nên không thể resolveAllowedProjects.
+     */
+    public ProjectProgressReportResponse.ProjectProgressReportItem getProjectProgressByProjectId(UUID projectId) {
+        String sql = """
+                SELECT p.id, p.code, p.name, p.progress,
+                       COUNT(t.id) AS total_tasks,
+                       COUNT(CASE WHEN t.status = 'DONE' THEN 1 END) AS done_tasks
+                FROM projects p
+                LEFT JOIN tasks t ON p.id = t.project_id AND t.deleted_at IS NULL
+                WHERE p.deleted_at IS NULL AND p.id = ?
+                GROUP BY p.id, p.code, p.name, p.progress
+                """;
+        List<ProjectProgressReportResponse.ProjectProgressReportItem> items = jdbcTemplate.query(sql,
+                (rs, rowNum) -> new ProjectProgressReportResponse.ProjectProgressReportItem(
+                        UUID.fromString(rs.getString("id")),
+                        rs.getString("code"),
+                        rs.getString("name"),
+                        rs.getInt("progress"),
+                        rs.getLong("total_tasks"),
+                        rs.getLong("done_tasks")),
+                projectId);
+        return items.isEmpty() ? null : items.get(0);
+    }
+
     public RiskIssueSummaryReportResponse getRiskIssueSummary(
             UserPrincipal actor,
             UUID projectId) {

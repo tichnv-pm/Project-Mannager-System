@@ -6,6 +6,7 @@ import { permissionGuard } from './core/guards/permission.guard';
 
 export const routes: Routes = [
   { path: 'auth/login', component: LoginComponent },
+  { path: 'public/shared-reports/:token', loadComponent: () => import('./pages/reports/public-shared-report.component').then(m => m.PublicSharedReportComponent) },
   {
     path: '',
     component: MainLayoutComponent,

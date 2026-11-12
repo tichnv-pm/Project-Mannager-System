@@ -26,7 +26,8 @@ import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * Rate limit theo IP cho các endpoint public nhạy cảm (không cần JWT nên không
- * được bảo vệ bởi cơ chế auth): login và git webhook. Sliding window đơn giản
+ * được bảo vệ bởi cơ chế auth): login, git webhook, và share-link báo cáo stakeholder
+ * (GĐ4 cải tiến — chống dò token qua endpoint public). Sliding window đơn giản
  * trong bộ nhớ (đủ cho triển khai 1 instance hiện tại — docker-compose); nếu
  * scale ra nhiều instance cần chuyển sang store dùng chung (Redis...).
  */
@@ -52,12 +53,15 @@ public class RateLimitFilter extends OncePerRequestFilter {
             @Value("${app.security.rate-limit.login.max-requests:20}") int loginMaxRequests,
             @Value("${app.security.rate-limit.login.window-seconds:60}") int loginWindowSeconds,
             @Value("${app.security.rate-limit.webhook.max-requests:60}") int webhookMaxRequests,
-            @Value("${app.security.rate-limit.webhook.window-seconds:60}") int webhookWindowSeconds) {
+            @Value("${app.security.rate-limit.webhook.window-seconds:60}") int webhookWindowSeconds,
+            @Value("${app.security.rate-limit.shared-report.max-requests:30}") int sharedReportMaxRequests,
+            @Value("${app.security.rate-limit.shared-report.window-seconds:60}") int sharedReportWindowSeconds) {
         this.objectMapper = objectMapper;
         this.enabled = enabled;
         this.rules = List.of(
                 new Rule("/api/v1/auth/login", loginMaxRequests, loginWindowSeconds * 1000L),
-                new Rule("/api/v1/public/webhooks/", webhookMaxRequests, webhookWindowSeconds * 1000L));
+                new Rule("/api/v1/public/webhooks/", webhookMaxRequests, webhookWindowSeconds * 1000L),
+                new Rule("/api/v1/public/shared-reports/", sharedReportMaxRequests, sharedReportWindowSeconds * 1000L));
     }
 
     @Override

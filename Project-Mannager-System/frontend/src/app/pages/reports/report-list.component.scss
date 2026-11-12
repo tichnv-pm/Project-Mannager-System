@@ -325,6 +325,96 @@
   }
 }
 
+/* ─── Share-link báo cáo tiến độ (GĐ4 cải tiến) ──────────────── */
+.share-links-section {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+
+  .share-links-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 4px;
+
+    h4 { margin: 0; font-size: 0.95rem; color: #f1f5f9; }
+  }
+
+  .hint {
+    margin: 4px 0 12px;
+    font-size: 0.78rem;
+    color: #94a3b8;
+  }
+
+  .share-form {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+
+    .form-control {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 0.85rem;
+
+      &:focus { outline: none; border-color: #3b82f6; }
+    }
+  }
+
+  .report-loading { padding: 8px 0; color: #94a3b8; font-size: 0.82rem; }
+
+  .share-link-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .share-link-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: rgba(30, 41, 59, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 10px 14px;
+
+    &.revoked { opacity: 0.55; }
+
+    .share-link-main {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+    }
+
+    .share-link-url {
+      font-size: 0.76rem;
+      color: #93c5fd;
+      font-family: monospace;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 480px;
+    }
+
+    .share-link-meta {
+      font-size: 0.74rem;
+      color: #64748b;
+    }
+
+    .share-link-actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+  }
+}
+
 /* ─── KPI + Summary (risk & issue) ────────────────────────────── */
 .kpi-grid {
   display: grid;

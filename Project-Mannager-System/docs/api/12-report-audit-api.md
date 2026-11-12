@@ -19,6 +19,10 @@ Báo cáo tổng hợp (aggregate tại DB, tránh N+1) cho ADMIN/PM + xuất fi
 | GET | `/api/v1/reports/risk-issue-summary` | `report:view` | Tổng hợp risk & issue | FR-REP-05 |
 | GET | `/api/v1/reports/quality-kpi` | `report:view` | KPI chất lượng (defect density, escape rate) | GĐ3 cải tiến |
 | GET | `/api/v1/reports/export` | `report:export` | Xuất CSV/Excel báo cáo | FR-REP-06 |
+| POST | `/api/v1/projects/{projectId}/report-share-links` | `report:share` | Tạo share-link cho stakeholder ngoài tổ chức | GĐ4 cải tiến |
+| GET | `/api/v1/projects/{projectId}/report-share-links` | `report:share` | Danh sách share-link của dự án | GĐ4 cải tiến |
+| DELETE | `/api/v1/report-share-links/{id}` | `report:share` | Thu hồi share-link | GĐ4 cải tiến |
+| GET | `/api/v1/public/shared-reports/{token}` | public (không auth) | Xem báo cáo tiến độ qua share-link | GĐ4 cải tiến |
 | GET | `/api/v1/audit-logs` | `audit:view` | Nhật ký hoạt động | FR-AUD-01 |
 
 ## 3. Chi tiết endpoint
@@ -101,7 +105,19 @@ Báo cáo tổng hợp (aggregate tại DB, tránh N+1) cho ADMIN/PM + xuất fi
 - **Streaming (v1.1)**: endpoint trả trực tiếp qua `HttpServletResponse.getOutputStream()` — service ghi CSV vào `OutputStream` bằng `PrintWriter` UTF-8 autoflush, không giữ toàn bộ trong RAM (thay `byte[]` cũ).
 - **Lỗi**: `400 EXPORT_LIMIT_EXCEEDED` (quá 10.000 dòng — FR-REP-06); `400 VALIDATION_ERROR` (report không hợp lệ).
 
-### 3.8 GET `/api/v1/audit-logs`
+### 3.8 Share-link báo cáo tiến độ cho stakeholder ngoài tổ chức (GĐ4 cải tiến)
+
+Cho PM/ADMIN chia sẻ % tiến độ dự án (từ `project-progress`, §3.4) với người ngoài tổ chức (khách hàng, nhà đầu tư...) qua link công khai, không cần tài khoản. Token công khai **chính là `id`** (UUID) của share-link — cùng quy ước "UUID không đoán được" dùng cho mọi entity khác trong hệ thống, không có cột token riêng.
+
+- **POST `/api/v1/projects/{projectId}/report-share-links`** (`report:share`, nghiêm hơn `report:view` vì là hành động public-facing — chỉ ADMIN/PM dự án, không có MEMBER). Audit: có.
+  - Request: `{ "label": "Báo cáo cho khách hàng ABC", "expiresAt": "2026-12-31" }` (cả 2 field tùy chọn; `expiresAt` tính hết ngày UTC đó).
+  - Response `201` — `ReportShareLinkResponse`: `{ id, projectId, label, expiresAt, active, createdBy, createdAt }`. `id` dùng trực tiếp trong URL công khai.
+- **GET `/api/v1/projects/{projectId}/report-share-links`** (`report:share`) — danh sách link của 1 dự án, mới nhất trước.
+- **DELETE `/api/v1/report-share-links/{id}`** (`report:share`) — thu hồi (soft delete). `204`. Sau khi thu hồi, link công khai trả `404` ngay.
+- **GET `/api/v1/public/shared-reports/{token}`** — **không cần đăng nhập** (`permitAll`, cùng mẫu `/api/v1/public/webhooks/**`), rate-limit riêng theo IP (mặc định 30 req/60s, chống dò token — `RateLimitFilter`). Response `200` — `PublicProjectProgressResponse`: `{ projectCode, projectName, label, progress, totalTasks, doneTasks, generatedAt }` — **chỉ** các field tổng hợp này, không có gì khác từ dự án. **Lỗi**: `404 NOT_FOUND` cho cả 3 trường hợp (chưa từng tồn tại / đã thu hồi / đã hết hạn) — **không phân biệt** qua message khác nhau, tránh lộ thông tin cho người đang dò token.
+- **Frontend**: quản lý (tạo/copy/thu hồi) ở tab "📈 Tiến độ dự án" trong màn hình Report (`report-list.component`); xem công khai ở route riêng `/public/shared-reports/:token` (`public-shared-report.component`, không nằm trong layout/`authGuard` chính) — có nút "In / Lưu PDF" dùng `window.print()` (không thêm thư viện PDF mới).
+
+### 3.9 GET `/api/v1/audit-logs`
 
 - **Phân quyền**: `audit:view` (chỉ ADMIN). Audit: không (bản thân là log).
 - **Query params**:
@@ -146,6 +162,7 @@ Báo cáo tổng hợp (aggregate tại DB, tránh N+1) cho ADMIN/PM + xuất fi
 |---|---|---|
 | GET /reports/* | UC-012 | AC-012-* |
 | GET /reports/export | UC-012 | AC-012-* |
+| /projects/{id}/report-share-links, /public/shared-reports/{token} | GĐ4 cải tiến | — |
 | GET /audit-logs | UC-013 | AC-013-* |
 
 ## 5. Ghi chú thiết kế

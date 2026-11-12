@@ -1,0 +1,131 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  background: #f1f5f9;
+}
+
+.public-report-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 48px 20px;
+}
+
+.state-box {
+  background: #fff;
+  border-radius: 12px;
+  padding: 40px 24px;
+  text-align: center;
+  color: #475569;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06);
+}
+
+.error-box {
+  color: #b91c1c;
+}
+
+.report-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.08);
+}
+
+.report-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 20px;
+  margin-bottom: 24px;
+
+  .brand {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: #0f172a;
+  }
+
+  .project-code {
+    margin-top: 4px;
+    font-size: 0.8rem;
+    font-family: monospace;
+    color: #3b82f6;
+  }
+}
+
+.print-btn {
+  flex-shrink: 0;
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover { background: #2563eb; }
+}
+
+.report-label {
+  font-size: 0.9rem;
+  color: #334155;
+  background: #eff6ff;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 20px;
+}
+
+.progress-block {
+  text-align: center;
+  padding: 20px 0;
+
+  .progress-pct {
+    font-size: 3rem;
+    font-weight: 800;
+    color: #1d4ed8;
+  }
+
+  .progress-track {
+    height: 14px;
+    background: #e2e8f0;
+    border-radius: 7px;
+    overflow: hidden;
+    margin: 16px 0;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6, #22c55e);
+    border-radius: 7px;
+    transition: width 0.4s ease;
+  }
+
+  .progress-meta {
+    font-size: 0.95rem;
+    color: #475569;
+  }
+}
+
+.generated-at {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 0.74rem;
+  color: #94a3b8;
+}
+
+@media print {
+  :host { background: #fff; }
+  .public-report-page { padding: 0; max-width: none; }
+  .report-card { box-shadow: none; border-radius: 0; }
+  .print-btn { display: none; }
+}

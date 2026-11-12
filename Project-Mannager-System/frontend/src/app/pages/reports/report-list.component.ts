@@ -4,9 +4,10 @@ import { FormsModule } from '@angular/forms';
 import { Subject, takeUntil } from 'rxjs';
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
+import { AuthService } from '../../core/auth/auth.service';
 import { ProjectService } from '../projects/project.service';
 import { ProjectOption } from '../dashboard/dashboard.model';
-import { QualityKpiReport, ReportService, ReportType } from './report.service';
+import { QualityKpiReport, ReportService, ReportShareLink, ReportType } from './report.service';
 
 type ReportTabKey = 'tasks-by-status' | 'tasks-by-assignee' | 'overdue-tasks' | 'project-progress' | 'risk-issue-summary' | 'quality-kpi';
 
@@ -21,6 +22,7 @@ export class ReportListComponent implements OnInit, OnDestroy {
   readonly Math = Math;
   private reportService = inject(ReportService);
   private projectService = inject(ProjectService);
+  private authService = inject(AuthService);
   private destroy$ = new Subject<void>();
 
   // ─── State ────────────────────────────────────────────────────
@@ -55,6 +57,16 @@ export class ReportListComponent implements OnInit, OnDestroy {
   qualityKpiReport = signal<QualityKpiReport | null>(null);
 
   exporting = signal(false);
+
+  // ─── Share-link báo cáo tiến độ (GĐ4 cải tiến) ──────────────────
+  shareLinks = signal<ReportShareLink[]>([]);
+  shareLinksLoading = signal(false);
+  shareLinksError = signal<string | null>(null);
+  showShareForm = signal(false);
+  newShareLabel = '';
+  newShareExpiresAt = '';
+  shareBusy = signal(false);
+  copiedLinkId = signal<string | null>(null);
 
   readonly statusLabels: Record<string, string> = {
     TODO: 'Cần làm', IN_PROGRESS: 'Đang làm', REVIEW: 'Review', DONE: 'Hoàn thành', BLOCKED: 'Bị chặn', CANCELLED: 'Đã hủy'
@@ -144,6 +156,10 @@ export class ReportListComponent implements OnInit, OnDestroy {
           next: res => { this.progressReport.set(res.items || []); this.loading.set(false); },
           error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'Không thể tải báo cáo'); }
         });
+        this.shareLinks.set([]);
+        if (this.selectedProjectId && this.canShare()) {
+          this.loadShareLinks();
+        }
         break;
       }
       case 'risk-issue-summary':
@@ -183,6 +199,71 @@ export class ReportListComponent implements OnInit, OnDestroy {
 
   maxCount(items: { count: number }[]): number {
     return Math.max(1, ...items.map(i => i.count));
+  }
+
+  // ─── Share-link báo cáo tiến độ (GĐ4 cải tiến) ──────────────────
+  canShare(): boolean {
+    return this.authService.hasPermission('report:share');
+  }
+
+  loadShareLinks(): void {
+    if (!this.selectedProjectId) return;
+    this.shareLinksLoading.set(true);
+    this.shareLinksError.set(null);
+    this.reportService.getShareLinks(this.selectedProjectId).pipe(takeUntil(this.destroy$)).subscribe({
+      next: links => { this.shareLinks.set(links); this.shareLinksLoading.set(false); },
+      error: err => { this.shareLinksLoading.set(false); this.shareLinksError.set(err?.error?.message || 'Không thể tải danh sách link'); }
+    });
+  }
+
+  openShareForm(): void {
+    this.newShareLabel = '';
+    this.newShareExpiresAt = '';
+    this.showShareForm.set(true);
+  }
+
+  cancelShareForm(): void {
+    this.showShareForm.set(false);
+  }
+
+  createShareLink(): void {
+    if (!this.selectedProjectId || this.shareBusy()) return;
+    this.shareBusy.set(true);
+    this.shareLinksError.set(null);
+    this.reportService.createShareLink(this.selectedProjectId, {
+      label: this.newShareLabel || undefined,
+      expiresAt: this.newShareExpiresAt || undefined
+    }).subscribe({
+      next: () => {
+        this.shareBusy.set(false);
+        this.showShareForm.set(false);
+        this.loadShareLinks();
+      },
+      error: err => {
+        this.shareBusy.set(false);
+        this.shareLinksError.set(err?.error?.message || 'Tạo link chia sẻ thất bại');
+      }
+    });
+  }
+
+  revokeShareLink(link: ReportShareLink): void {
+    if (!confirm(`Thu hồi link chia sẻ "${link.label || link.id}"? Stakeholder đang có link này sẽ không xem được nữa.`)) return;
+    this.shareBusy.set(true);
+    this.reportService.revokeShareLink(link.id).subscribe({
+      next: () => { this.shareBusy.set(false); this.loadShareLinks(); },
+      error: err => { this.shareBusy.set(false); this.shareLinksError.set(err?.error?.message || 'Thu hồi link thất bại'); }
+    });
+  }
+
+  shareLinkUrl(link: ReportShareLink): string {
+    return `${window.location.origin}/public/shared-reports/${link.id}`;
+  }
+
+  copyShareLink(link: ReportShareLink): void {
+    navigator.clipboard.writeText(this.shareLinkUrl(link)).then(() => {
+      this.copiedLinkId.set(link.id);
+      setTimeout(() => this.copiedLinkId.set(null), 2000);
+    });
   }
 
   exportReport(): void {

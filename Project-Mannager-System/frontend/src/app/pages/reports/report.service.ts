@@ -74,6 +74,33 @@ export interface ReportParams {
 
 export type ReportType = 'tasks-by-status' | 'tasks-by-assignee' | 'overdue-tasks' | 'project-progress' | 'risk-issue-summary';
 
+/** Share-link báo cáo tiến độ cho stakeholder ngoài tổ chức (GĐ4 cải tiến). */
+export interface ReportShareLink {
+  id: string;
+  projectId: string;
+  label?: string;
+  expiresAt?: string;
+  active: boolean;
+  createdBy?: string;
+  createdAt: string;
+}
+
+export interface ReportShareLinkCreateRequest {
+  label?: string;
+  expiresAt?: string;
+}
+
+/** Nội dung xem công khai qua share-link, không cần đăng nhập. */
+export interface PublicProjectProgress {
+  projectCode: string;
+  projectName: string;
+  label?: string;
+  progress: number;
+  totalTasks: number;
+  doneTasks: number;
+  generatedAt: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ReportService {
   private readonly API = '/api/v1/reports';
@@ -121,6 +148,24 @@ export class ReportService {
     if (p.fromDate) params = params.set('fromDate', p.fromDate);
     if (p.toDate) params = params.set('toDate', p.toDate);
     return this.http.get(`${this.API}/export`, { params, responseType: 'blob' });
+  }
+
+  // ─── Share-link (GĐ4 cải tiến) ─────────────────────────────────
+  getShareLinks(projectId: string): Observable<ReportShareLink[]> {
+    return this.http.get<ReportShareLink[]>(`/api/v1/projects/${projectId}/report-share-links`);
+  }
+
+  createShareLink(projectId: string, req: ReportShareLinkCreateRequest): Observable<ReportShareLink> {
+    return this.http.post<ReportShareLink>(`/api/v1/projects/${projectId}/report-share-links`, req);
+  }
+
+  revokeShareLink(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/v1/report-share-links/${id}`);
+  }
+
+  /** Xem công khai qua share-link — không cần đăng nhập. */
+  getPublicProjectProgress(token: string): Observable<PublicProjectProgress> {
+    return this.http.get<PublicProjectProgress>(`/api/v1/public/shared-reports/${token}`);
   }
 
   private buildParams(p: ReportParams): HttpParams {

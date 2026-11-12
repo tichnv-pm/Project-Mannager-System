@@ -169,6 +169,53 @@
       </div>
     </div>
   </div>
+
+  <!-- ─── Share-link cho stakeholder ngoài tổ chức (GĐ4 cải tiến) ─── -->
+  <div class="share-links-section" *ngIf="selectedProjectId && canShare()">
+    <div class="share-links-head">
+      <h4>🔗 Chia sẻ cho stakeholder ngoài tổ chức</h4>
+      <button class="btn btn-secondary btn-sm" (click)="openShareForm()" [disabled]="showShareForm()">
+        ➕ Tạo link chia sẻ
+      </button>
+    </div>
+    <p class="hint">
+      Link công khai, không cần đăng nhập, chỉ xem % tiến độ + số task hoàn thành của dự án này. Thu hồi bất cứ lúc nào.
+    </p>
+
+    <div *ngIf="shareLinksError()" class="alert alert-danger">⚠️ {{ shareLinksError() }}</div>
+
+    <div *ngIf="showShareForm()" class="share-form">
+      <input type="text" class="form-control" placeholder="Nhãn (VD: Báo cáo cho khách hàng ABC)" [(ngModel)]="newShareLabel" maxlength="200" />
+      <input type="date" class="form-control" [(ngModel)]="newShareExpiresAt" title="Ngày hết hạn (bỏ trống = không hết hạn)" />
+      <button class="btn btn-primary btn-sm" (click)="createShareLink()" [disabled]="shareBusy()">Tạo</button>
+      <button class="btn btn-secondary btn-sm" (click)="cancelShareForm()">Hủy</button>
+    </div>
+
+    <div *ngIf="shareLinksLoading()" class="report-loading">Đang tải...</div>
+
+    <app-empty-state *ngIf="!shareLinksLoading() && shareLinks().length === 0" icon="🔗"
+      title="Chưa có link chia sẻ nào" description="Tạo link để gửi báo cáo tiến độ cho khách hàng/nhà đầu tư ngoài tổ chức."></app-empty-state>
+
+    <div class="share-link-list" *ngIf="!shareLinksLoading() && shareLinks().length > 0">
+      <div class="share-link-row" *ngFor="let link of shareLinks()" [class.revoked]="!link.active">
+        <div class="share-link-main">
+          <strong>{{ link.label || '(không có nhãn)' }}</strong>
+          <span class="share-link-url">{{ shareLinkUrl(link) }}</span>
+          <span class="share-link-meta">
+            Tạo {{ link.createdAt | date:'dd/MM/yyyy HH:mm' }}
+            <span *ngIf="link.expiresAt"> · hết hạn {{ link.expiresAt | date:'dd/MM/yyyy' }}</span>
+            <span *ngIf="!link.active" class="status-pill" style="background:#64748b"> Đã thu hồi/hết hạn</span>
+          </span>
+        </div>
+        <div class="share-link-actions" *ngIf="link.active">
+          <button class="btn btn-secondary btn-sm" (click)="copyShareLink(link)">
+            {{ copiedLinkId() === link.id ? '✔ Đã copy' : '📋 Copy link' }}
+          </button>
+          <button class="btn btn-danger btn-sm" (click)="revokeShareLink(link)" [disabled]="shareBusy()">🗑️ Thu hồi</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </section>
 
 <!-- ═══════════════ 5. Risk & Issue summary ═══════════════ -->
