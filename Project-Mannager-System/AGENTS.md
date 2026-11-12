@@ -173,3 +173,30 @@ Giá trị impact được tính và lưu **tại thời điểm tạo suggestio
 **Kiểm tra:** `TaskIntegrationTest` 58/58 PASS (54 cũ + 4 mới); `mvn test` toàn bộ backend; frontend `npm test` 73/73 PASS + `npm run build` thành công, không cảnh báo budget.
 
 **GĐ3 (Agile/Quality nghiệp vụ) — HOÀN TẤT 7/7 hạng mục** (Epic/Story/Backlog, Velocity/Burndown, Definition of Done, KPI chất lượng, Change Request Scope-Schedule-Cost, Retrospective gắn Sprint, màn hình Backlog kéo-thả).
+
+## Giai đoạn 4 (phần 1/3) — Observability: Actuator metrics (2026-11-12)
+
+Trước đây Actuator chỉ expose `health,info`, không có metrics gì để theo dõi hệ thống (JVM heap, HTTP latency theo route, connection pool...).
+
+- **Thêm** `io.micrometer:micrometer-registry-prometheus` (version theo Spring Boot BOM) + expose `metrics,prometheus` (ngoài `health,info` cũ) — `GET /actuator/metrics`, `GET /actuator/prometheus` (format Prometheus text để scrape).
+- **Bảo mật:** `/actuator/health` vẫn public (`show-details: never`, không lộ chi tiết DB/disk); **mọi actuator khác chỉ ADMIN** (`SecurityConfig` +rule `requestMatchers("/actuator/**").hasRole("ADMIN")`) — metric nội bộ (tên route, thời gian xử lý...) không nên lộ cho user thường.
+- **Phát hiện khi làm:** Spring Boot Test tự set `management.defaults.metrics.export.enabled=false` cho mọi `@SpringBootTest` (tránh overhead khi test) — phải set tường minh `management.prometheus.metrics.export.enabled=true` trong `application.yml` (không dựa vào `management.defaults.*`) để endpoint hoạt động nhất quán cả khi test và khi chạy thật.
+
+**File cập nhật:** `backend/pom.xml`, `application.yml`, `SecurityConfig.java`, `SecuritySmokeIntegrationTest.java` (+4 test), `docs/design/07-deployment-design.md` (+mục 12).
+**Kiểm tra:** `SecuritySmokeIntegrationTest` 8/8 PASS; `mvn test` toàn bộ backend 327/327 PASS.
+
+**Chưa làm:** dựng Prometheus/Grafana server thật để scrape + dashboard — phiên này chỉ đảm bảo backend "phơi" đúng/đủ metric và bảo mật đúng.
+
+## Giai đoạn 4 (phần 2/3) — Backup/restore PostgreSQL (2026-11-12)
+
+Production chạy trên **Neon Postgres** (`render.yaml`), nên chiến lược tính cả đặc thù này thay vì giả định tự quản lý Postgres:
+
+- **Lớp bảo vệ chính:** Neon Point-in-Time Recovery (PITR, theo plan đang dùng) — không cần code, chỉ cần biết dùng khi cần.
+- **Lớp bổ sung:** `scripts/backup-db.sh` (pg_dump, tự parse `DB_URL`/`DB_USERNAME`/`DB_PASSWORD` sẵn có ra host/port/dbname/sslmode, không cần biến môi trường mới) + `scripts/restore-db.sh <file>` (pg_restore, bắt gõ lại đúng tên DB đích để xác nhận trước khi ghi đè).
+- **Quy tắc:** không commit file `.dump` vào git; backup trước mỗi migration rủi ro trên production; restore luôn test trên Neon branch tạm trước, không restore trực tiếp lên production khi chưa kiểm chứng.
+
+**File tạo mới:** `scripts/backup-db.sh`, `scripts/restore-db.sh`.
+**File cập nhật:** `docs/design/07-deployment-design.md` (+mục 13).
+**Kiểm tra:** `bash -n` cả 2 script (cú pháp hợp lệ) + test logic parse JDBC URL cho cả 2 kiểu (Neon có `sslmode=require`, docker-compose local không có query string) — **chưa chạy restore thật** vì phiên này không có Neon branch thử nghiệm hoặc Postgres thật để kiểm chứng full cycle; cần làm trước khi dùng thật trên production.
+
+**Còn lại 1/3 hạng mục GĐ4:** Stakeholder report (share-link/PDF cho người ngoài tổ chức) — public-facing, rủi ro bảo mật, đang thiết kế scoping riêng.

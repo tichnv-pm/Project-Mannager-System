@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * Security filter chain (docs/design/04-security-design.md).
  * - Stateless (JWT trong header Authorization, không cookie → không cần CSRF — csrf.disable()).
  * - Public: login/refresh, Swagger UI, /v3/api-docs, actuator health.
+ * - Actuator khác (metrics, prometheus, info) chỉ ADMIN — GĐ4 cải tiến (observability).
  * - 401/403 trả JSON error response thống nhất.
  */
 @Configuration
@@ -56,6 +57,7 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/actuator/health",
                                 "/api/v1/public/webhooks/**").permitAll()
+                        .requestMatchers("/actuator/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .exceptionHandling(handling -> handling
                         .authenticationEntryPoint((request, response, ex) ->

@@ -50,6 +50,43 @@ class SecuritySmokeIntegrationTest {
     }
 
     @Test
+    void actuatorMetrics_withoutAuth_returns401() throws Exception {
+        mockMvc.perform(get("/actuator/metrics"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void actuatorMetrics_nonAdmin_returns403() throws Exception {
+        UserPrincipal principal = new UserPrincipal(
+                UUID.randomUUID(), "pm", List.of("PROJECT_MANAGER"), List.of("project:view"));
+        String token = jwtService.generateAccessToken(principal);
+
+        mockMvc.perform(get("/actuator/metrics").header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void actuatorMetrics_admin_returns200() throws Exception {
+        UserPrincipal principal = new UserPrincipal(
+                UUID.randomUUID(), "admin", List.of("ADMIN"), List.of("project:view"));
+        String token = jwtService.generateAccessToken(principal);
+
+        mockMvc.perform(get("/actuator/metrics").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.names").isArray());
+    }
+
+    @Test
+    void actuatorPrometheus_admin_returns200() throws Exception {
+        UserPrincipal principal = new UserPrincipal(
+                UUID.randomUUID(), "admin", List.of("ADMIN"), List.of("project:view"));
+        String token = jwtService.generateAccessToken(principal);
+
+        mockMvc.perform(get("/actuator/prometheus").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void authenticatedRequest_unknownRoute_returns404Json() throws Exception {
         UserPrincipal principal = new UserPrincipal(
                 UUID.randomUUID(), "admin", List.of("ADMIN"), List.of("project:view"));
