@@ -5,7 +5,7 @@ import { DragDropModule, CdkDragDrop, moveItemInArray, transferArrayItem } from 
 import { SprintService } from './sprint.service';
 import { BurndownPointResponse, SprintResponse, SprintStatus } from './sprint.model';
 import { TaskService } from '../../tasks/task.service';
-import { TaskSummaryResponse, TaskUpdateRequest } from '../../tasks/task.model';
+import { TaskSummaryResponse } from '../../tasks/task.model';
 import { HasPermissionDirective } from '../../../shared/directives/has-permission.directive';
 
 @Component({
@@ -227,19 +227,9 @@ export class ProjectSprintsComponent implements OnInit {
         event.currentIndex
       );
 
-      // Call API to update task sprint
-      const request: TaskUpdateRequest = {
-        title: task.title,
-        status: task.status,
-        priority: task.priority,
-        type: task.type,
-        progress: task.progress,
-        blocked: task.blocked,
-        sprintId: sprintId ? sprintId : undefined,
-        version: task.version
-      };
-
-      this.taskService.updateTask(task.id, request).subscribe({
+      // Đổi sprint qua endpoint riêng (PUT /tasks/{id}/sprint) — generic updateTask() ghi đè vô điều
+      // kiện storyPoints/ngày/mô tả nếu không gửi lại, kéo-thả chỉ muốn đổi đúng sprintId.
+      this.taskService.changeSprint(task.id, sprintId ? sprintId : null).subscribe({
         next: (updatedTask) => {
           // Update version to avoid optimistic locking error on next move
           task.version = updatedTask.version;

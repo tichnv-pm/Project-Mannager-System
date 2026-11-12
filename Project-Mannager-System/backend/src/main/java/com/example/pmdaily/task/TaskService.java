@@ -408,6 +408,37 @@ public class TaskService {
         return toResponse(saved);
     }
 
+    /**
+     * Đổi/gỡ sprint — endpoint riêng cho kéo-thả trên bảng Sprint (Backlog ↔ Sprint). Phát hiện khi
+     * test thật trên bản deploy: handler kéo-thả ở frontend gửi {@code TaskUpdateRequest} chỉ chứa
+     * vài field (title/status/priority/type/progress/blocked/sprintId/version) — vì generic update()
+     * ghi đè vô điều kiện các field tùy chọn không có trong payload đó (storyPoints, startDate,
+     * dueDate, estimateMinutes, description đều set thẳng theo request, không có guard null-là-
+     * không-đổi như sprintId/parentTaskId), mỗi lần kéo-thả đổi sprint sẽ xóa luôn storyPoints/ngày/
+     * mô tả của task — vô hiệu hóa Velocity/Burndown ngay khi dùng thật. Endpoint này tách riêng,
+     * chỉ đổi đúng 1 field, không đụng field nào khác. sprintId null = gỡ khỏi sprint (về Backlog).
+     */
+    @Transactional
+    public TaskResponse changeSprint(UserPrincipal actor, UUID taskId, UUID sprintId) {
+        Task task = findActive(taskId);
+        Project project = task.getProject();
+        if (!isAdminOrPm(actor) && !isProjectManager(project, actor.getId())) {
+            throw new BusinessException(ErrorCode.ACCESS_DENIED);
+        }
+        if (sprintId != null) {
+            sprintRepository.findByIdAndDeletedAtIsNull(sprintId)
+                    .filter(s -> s.getProjectId().equals(project.getId()))
+                    .orElseThrow(() -> new BusinessException(ErrorCode.BAD_REQUEST, "Sprint không hợp lệ cho dự án này"));
+        }
+        UUID from = task.getSprintId();
+        task.setSprintId(sprintId);
+        Task saved = taskRepository.save(task);
+        auditService.record("TASK_SPRINT_CHANGED", ENTITY_TYPE, saved.getId(),
+                Map.of("sprintId", String.valueOf(from)), Map.of("sprintId", String.valueOf(sprintId)));
+        log.info("task.sprint id={} sprintId={} actor={}", saved.getId(), sprintId, actor.getUsername());
+        return toResponse(saved);
+    }
+
     @Transactional
     public TaskResponse changeStatus(UserPrincipal actor, UUID taskId, StatusUpdateRequest request) {
         Task task = findActive(taskId);

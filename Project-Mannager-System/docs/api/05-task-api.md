@@ -39,6 +39,7 @@ TODO ──→ IN_PROGRESS ──→ REVIEW ──→ DONE
 | PUT | `/api/v1/tasks/{id}/blocker` | `task:update` / assignee | Đánh dấu blocker | FR-TASK-09 |
 | GET | `/api/v1/tasks/{id}/children` | `task:view` | Task con | FR-TASK-12 |
 | PUT | `/api/v1/tasks/{id}/parent` | `task:update` | Đổi/gỡ parent (Epic↔Story/Task) — màn hình Backlog kéo-thả, GĐ3 cải tiến | FR-TASK-12 |
+| PUT | `/api/v1/tasks/{id}/sprint` | `task:update` | Đổi/gỡ sprint — kéo-thả trên bảng Sprint, GĐ4 (bug-fix dữ liệu thật) | FR-TASK-12 |
 | PUT | `/api/v1/tasks/{id}/tags` | `task:update` | Gán tag | FR-TASK-02 |
 | PUT | `/api/v1/tasks/{id}/collaborators` | `task:assign` | Người phối hợp | FR-TASK-01 |
 | PUT | `/api/v1/tasks/{id}/watchers` | `task:update` | Người theo dõi | FR-TASK-01 |
@@ -202,6 +203,13 @@ TODO ──→ IN_PROGRESS ──→ REVIEW ──→ DONE
 - **Response `200`** — `TaskResponse` (kèm `parentTaskId` mới).
 - **Lỗi**: `400 INVALID_EPIC_STORY_HIERARCHY` (BR-TASK-19), `400 PARENT_TASK_PROJECT_MISMATCH`, `400 CIRCULAR_PARENT`, `403 ACCESS_DENIED`, `404`.
 - **Lưu ý quan trọng (sửa cùng lúc với endpoint này):** trước đây `PUT /tasks/{id}` (3.5) coi `parentTaskId` thiếu/`null` trong body là "gỡ parent" — khác quy ước của các field quan hệ khác trong cùng request (`sprintId`, `collaboratorIds`, `watcherIds`, `tagIds`: thiếu/`null` = không đổi). Hệ quả: sửa bất kỳ field nào khác của 1 Story qua `PUT /tasks/{id}` mà không gửi lại `parentTaskId` sẽ vô tình gỡ Story khỏi Epic. Đã sửa `PUT /tasks/{id}` để cùng quy ước "`null` = không đổi"; muốn gỡ hẳn parent phải gọi đúng endpoint 3.12 này với `parentTaskId: null` tường minh.
+
+### 3.12b PUT `/api/v1/tasks/{id}/sprint`
+
+- **Phân quyền**: `task:update`, chỉ ADMIN/PM dự án (cùng mức với 3.12). Audit: có (`TASK_SPRINT_CHANGED`). Dùng cho kéo-thả trên bảng Sprint (Backlog ↔ Sprint).
+- **Request body**: `{ "sprintId": "<uuid>" }` — `null` để gỡ hẳn (chuyển task về Backlog).
+- **Response `200`** — `TaskResponse`. **Lỗi**: `400 BAD_REQUEST` (sprint không thuộc project của task), `403 ACCESS_DENIED`, `404`.
+- **Phát hiện khi test thật trên bản deploy (GĐ4, không phải lúc thiết kế ban đầu):** handler kéo-thả ở frontend (`project-sprints.component.ts`) trước đây gọi `PUT /tasks/{id}` (3.5) với payload rút gọn chỉ gồm vài field (title/status/priority/type/progress/blocked/sprintId/version) — vì `update()` ghi đè **vô điều kiện** các field tùy chọn không nằm trong payload đó (`storyPoints`, `startDate`, `dueDate`, `estimateMinutes`, `description` không có guard "`null` = không đổi" như `sprintId`/`parentTaskId`), **mỗi lần kéo-thả đổi sprint sẽ xóa luôn `storyPoints`/ngày/mô tả của task** — vô hiệu hóa Velocity/Burndown (3.9 phần Sprint) ngay khi dùng thật, dù mọi test tích hợp đều PASS (không có test nào kiểm tra "field khác còn giữ sau khi chỉ đổi sprint qua kéo-thả"). Thêm hẳn endpoint riêng này để chỉ đổi đúng 1 field `sprintId`, không đụng field nào khác — cùng tư duy với fix `parentTaskId` ở 3.12, nhưng **đây là field giá trị (không phải quan hệ)** nên không mở rộng quy ước "null=không đổi" sang `update()` chung (sẽ phá luôn việc PM xóa ngày/mô tả qua form sửa task đầy đủ, vốn luôn gửi lại toàn bộ field) — chỉ tách call site kéo-thả ra dùng endpoint hẹp này.
 
 ### 3.13 Bình luận
 

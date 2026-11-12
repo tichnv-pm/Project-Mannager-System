@@ -653,6 +653,82 @@ class TaskIntegrationTest {
     }
 
     @Test
+    void changeSprint_setAndClear_doesNotTouchOtherFields() throws Exception {
+        MvcResult storyResult = mockMvc.perform(post("/api/v1/tasks")
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"projectId":"%s","title":"Story có storyPoints","type":"STORY","storyPoints":5}
+                                """.formatted(projectId)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String storyId = objectMapper.readTree(storyResult.getResponse().getContentAsString()).get("id").asText();
+
+        MvcResult sprintResult = mockMvc.perform(post("/api/v1/projects/{projectId}/sprints", projectId)
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"sprintName":"Sprint đổi task","startDate":"2026-01-01","endDate":"2026-01-14"}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String sprintId = objectMapper.readTree(sprintResult.getResponse().getContentAsString()).get("id").asText();
+
+        // Gán sprint -> storyPoints phải GIỮ NGUYÊN (không bị ghi đè như generic update() trước đây)
+        mockMvc.perform(put("/api/v1/tasks/{id}/sprint", storyId)
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sprintId\":\"" + sprintId + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sprintId").value(sprintId))
+                .andExpect(jsonPath("$.storyPoints").value(5));
+
+        // Gỡ hẳn sprint (về Backlog) -> sprintId null tường minh, storyPoints vẫn giữ
+        mockMvc.perform(put("/api/v1/tasks/{id}/sprint", storyId)
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sprintId\":null}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sprintId").doesNotExist())
+                .andExpect(jsonPath("$.storyPoints").value(5));
+    }
+
+    @Test
+    void changeSprint_byMember_returns403() throws Exception {
+        String taskId = createTask(projectId, memberId);
+
+        mockMvc.perform(put("/api/v1/tasks/{id}/sprint", taskId)
+                        .header("Authorization", bearer(member()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sprintId\":null}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+    }
+
+    @Test
+    void changeSprint_sprintFromOtherProject_returns400() throws Exception {
+        String taskId = createTask();
+
+        String otherProjectId = createProject("PRJ-TSK-OTHER2", null);
+        MvcResult sprintResult = mockMvc.perform(post("/api/v1/projects/{projectId}/sprints", otherProjectId)
+                        .header("Authorization", bearer(admin()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"sprintName":"Sprint dự án khác","startDate":"2026-01-01","endDate":"2026-01-14"}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String otherSprintId = objectMapper.readTree(sprintResult.getResponse().getContentAsString()).get("id").asText();
+
+        mockMvc.perform(put("/api/v1/tasks/{id}/sprint", taskId)
+                        .header("Authorization", bearer(pm()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sprintId\":\"" + otherSprintId + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
+    }
+
+    @Test
     void update_member_onlyOwnAssignedTaskLimitedFields() throws Exception {
         String ownTask = createTask(projectId, memberId);
         String otherTask = createTask(projectId, pmUserId);

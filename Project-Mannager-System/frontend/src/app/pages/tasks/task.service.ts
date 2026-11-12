@@ -90,6 +90,11 @@ export class TaskService {
     return this.http.put<TaskDetailResponse>(`${this.API_URL}/${id}/parent`, { parentTaskId });
   }
 
+  /** Đổi/gỡ sprint — dùng cho kéo-thả trên bảng Sprint, không đụng field nào khác của task. null để gỡ hẳn (về Backlog). */
+  public changeSprint(id: string, sprintId: string | null): Observable<TaskDetailResponse> {
+    return this.http.put<TaskDetailResponse>(`${this.API_URL}/${id}/sprint`, { sprintId });
+  }
+
   // ─── Status / Progress / Blocker ─────────────────────────────────
 
   public updateStatus(id: string, req: TaskStatusRequest): Observable<TaskDetailResponse> {
